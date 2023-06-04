@@ -7,6 +7,7 @@ project(${BOT_NAME})
 set(SOURCES
     src/main.cpp
     src/OsuWrapper.cpp
+    src/Bot.cpp
     src/DosuConfig.cpp
 )
 
