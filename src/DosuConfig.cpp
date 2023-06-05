@@ -9,7 +9,7 @@ int DosuConfig::osuApiCooldownMs;
 
 /**
  * Load JSON configuration.
-*/
+ */
 void DosuConfig::load(const std::string& filePath) 
 {
     nlohmann::json configDataJson;
