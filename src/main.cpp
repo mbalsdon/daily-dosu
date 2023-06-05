@@ -1,23 +1,51 @@
 #include "OsuWrapper.h"
 #include "Bot.h"
 #include "DosuConfig.h"
+#include "DailyJob.h"
 
 #include <iostream>
 #include <string>
+#include <functional>
+
+
+#include <thread>
+#include <chrono>
+void test()
+{
+    std::cout << "Hello world!" << std::endl;
+    std::this_thread::sleep_for(std::chrono::seconds(3));
+}
 
 /**
  * Entrypoint.
  * TODO: impl
-*/
+ */
 int main(int argc, char const *argv[])
 {
     // TODO: Dynamic filepath
     DosuConfig::load("/home/mathew/dev/daily-dosu/dosu_config.json");
-    std::string clientID = DosuConfig::osuClientID;
-    std::string clientSecret = DosuConfig::osuClientSecret;
-    int apiCooldownMs = DosuConfig::osuApiCooldownMs;
+
+    // Start bot
+    Bot bot(DosuConfig::discordBotToken);
+    std::thread botThread(&Bot::start, &bot);
+
+    // Give bot some time to start
+    std::this_thread::sleep_for(std::chrono::seconds(10));
+
+    // Start jobs
+    DailyJob job(12, "myJob", test, [&bot]() { bot.todoRemoveMeCallback(); });
+    std::thread jobThread(&DailyJob::start, &job);
+
+    botThread.join();
+    jobThread.join();
+
+    return 0;
+
+    // std::string clientID = DosuConfig::osuClientID;
+    // std::string clientSecret = DosuConfig::osuClientSecret;
+    // int apiCooldownMs = DosuConfig::osuApiCooldownMs;
     
-    OsuWrapper osu(clientID, clientSecret, apiCooldownMs);
+    // OsuWrapper osu(clientID, clientSecret, apiCooldownMs);
 
     // DosuUser user;
     // UserID id = 6385683;
@@ -30,9 +58,13 @@ int main(int argc, char const *argv[])
     //     std::cout << userIDs[i] << " ";
     // }
     // std::cout << std::endl;
-    
-    // Bot bot(DosuConfig::discordBotToken);
-    // bot.start();
-
-    return 0;
 }
+
+// TODO: job impl, bot callback impl
+// // store in json -> callback reads from json his ass is not using sqlite
+// TODO: error behaviour when bot/job breaks??
+// TODO: caching for job?
+// TODO: per-server behaviour; start/stop -> do/dont execute callback
+// TODO: go thru todos (readme, comments, etc)
+// TODO: release
+// TODO: callback filter options, sorting, etc?

@@ -9,6 +9,7 @@ set(SOURCES
     src/OsuWrapper.cpp
     src/Bot.cpp
     src/DosuConfig.cpp
+    src/DailyJob.cpp
 )
 
 add_executable(${BOT_NAME} ${SOURCES})

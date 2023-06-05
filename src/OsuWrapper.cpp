@@ -10,7 +10,7 @@
 
 /**
  * OsuWrapper constructor.
-*/
+ */
 OsuWrapper::OsuWrapper(const std::string& clientID, const std::string& clientSecret, const int apiCooldownMs)
 {
     m_clientID = clientID;
@@ -25,7 +25,7 @@ OsuWrapper::OsuWrapper(const std::string& clientID, const std::string& clientSec
 
 /**
  * OsuWrapper destructor.
-*/
+ */
 OsuWrapper::~OsuWrapper() 
 {
     curl_easy_cleanup(m_curlHandle);
@@ -34,13 +34,14 @@ OsuWrapper::~OsuWrapper()
 
 /**
  * Update OsuWrapper token field with new OAauth Client Credentials token.
-*/
+ */
 void OsuWrapper::updateToken()
 {
     std::cout << "OsuWrapper::updateToken - requesting OAuth token from osu!API..." << std::endl;
 
     CURL * tokenCurlHandle = curl_easy_init();
-    if (!tokenCurlHandle) {
+    if (!tokenCurlHandle)
+    {
         std::string reason = "OsuWrapper::updateToken - tokenCurlHandle does not exist!";
         throw std::runtime_error(reason);
     }
@@ -67,7 +68,8 @@ void OsuWrapper::updateToken()
     curl_easy_setopt(tokenCurlHandle, CURLOPT_WRITEFUNCTION, OsuWrapper::curlWriteCallback);
 
     CURLcode response = curl_easy_perform(tokenCurlHandle);
-    if (response != CURLE_OK) {
+    if (response != CURLE_OK)
+    {
         curl_easy_cleanup(tokenCurlHandle);
         std::string reason = std::string("OsuWrapper::updateToken - request failed! response=").append(std::to_string(response));
         throw std::runtime_error(reason);
@@ -75,7 +77,8 @@ void OsuWrapper::updateToken()
 
     long httpCode = 0;
     curl_easy_getinfo(tokenCurlHandle, CURLINFO_RESPONSE_CODE, &httpCode);
-    if (httpCode != 200) {
+    if (httpCode != 200)
+    {
         curl_easy_cleanup(tokenCurlHandle);
         std::string reason = std::string("OsuWrapper::updateToken - request failed! httpCode=").append(std::to_string(httpCode));
         throw std::runtime_error(reason);
@@ -84,15 +87,19 @@ void OsuWrapper::updateToken()
     curl_slist_free_all(requestHeaders);
 
     nlohmann::json responseDataJson = nlohmann::json::parse(responseData);
-    if (!responseDataJson.is_object()) {
+    if (!responseDataJson.is_object())
+    {
         curl_easy_cleanup(tokenCurlHandle);
         std::string reason = std::string("OsuWrapper::updateToken - responseDataJson is not an object! responseData=").append(responseData);
         throw std::runtime_error(reason);
     }
 
-    try {
+    try
+    {
         m_accessToken = responseDataJson.at("access_token").get<std::string>();
-    } catch (const std::exception& e) {
+    }
+    catch (const std::exception& e)
+    {
         curl_easy_cleanup(tokenCurlHandle);
         std::string reason = std::string("OsuWrapper::updateToken - could not access responseDataJson fields! responseData=").append(responseData);
         throw std::out_of_range(reason);
@@ -104,20 +111,23 @@ void OsuWrapper::updateToken()
  * Page=0 returns users ranked #1-#50, page=1 returns users ranked #51-#100, etc.
  * Data is returned in userIDs.
  * Returns true if request succeeds, false if otherwise.
-*/
+ */
 bool OsuWrapper::getRankingIDs(Page page, UserID userIDs[], size_t numIDs) 
 {
     std::cout << "OsuWrapper::getRankingIDs - requesting ranking data from osu!API..." << std::endl;
 
-    if (page > 200) {
+    if (page > 200)
+    {
         std::string reason = std::string("OsuWrapper::getRankingIDs - page cannot be greater than 200! page=").append(std::to_string(page));
         throw std::invalid_argument(reason);
     }
-    if (numIDs > 50) {
+    if (numIDs > 50)
+    {
         std::string reason = std::string("OsuWrapper::getRankingIDs - numIDs cannot be greater than 50! numIDs=").append(std::to_string(numIDs));
         throw std::invalid_argument(reason);
     }
-    if (!m_curlHandle) {
+    if (!m_curlHandle)
+    {
         std::string reason = "OsuWrapper::getRankingIDs - m_curlHandle does not exist!";
         throw std::runtime_error(reason);
     }
@@ -141,26 +151,32 @@ bool OsuWrapper::getRankingIDs(Page page, UserID userIDs[], size_t numIDs)
 
     curl_easy_setopt(m_curlHandle, CURLOPT_HTTPGET, 1L);
 
-    if (!makeRequest()) {
+    if (!makeRequest())
+    {
         return false;
     }
     
     curl_slist_free_all(requestHeaders);
 
     nlohmann::json responseDataJson = nlohmann::json::parse(responseData);
-    if (!responseDataJson.is_object()) {
+    if (!responseDataJson.is_object())
+    {
         std::string reason = std::string("OsuWrapper::getRankingIDs - responseDataJson is not an object! responseData=").append(responseData);
         throw std::runtime_error(reason);
     }
 
-    for (size_t i = 0; i < numIDs; ++i) {
-        try {
+    for (size_t i = 0; i < numIDs; ++i)
+    {
+        try
+        {
             UserID userID = responseDataJson.at("ranking")[i]
                                             .at("user")
                                             .at("id")
                                             .get<uint32_t>();
             userIDs[i] = userID;
-        } catch (const std::exception& e) {
+        }
+        catch (const std::exception& e)
+        {
             std::string reason = std::string("OsuWrapper::getRankingIDs - could not access responseDataJson fields! responseData=").append(responseData);
             throw std::out_of_range(reason);
         }
@@ -171,12 +187,13 @@ bool OsuWrapper::getRankingIDs(Page page, UserID userIDs[], size_t numIDs)
 
 /**
  * Get osu! user given their ID.
-*/
+ */
 bool OsuWrapper::getUser(UserID userID, DosuUser& user) 
 {
     std::cout << "OsuWrapper::getUser - requesting data from osu!API for user with ID " << userID << "..." << std::endl;
     
-    if (!m_curlHandle) {
+    if (!m_curlHandle)
+    {
         std::string reason = "OsuWrapper::getUser - m_curlHandle does not exist!";
         throw std::runtime_error(reason);
     }
@@ -200,19 +217,22 @@ bool OsuWrapper::getUser(UserID userID, DosuUser& user)
 
     curl_easy_setopt(m_curlHandle, CURLOPT_HTTPGET, 1L);
 
-    if (!makeRequest()) {
+    if (!makeRequest())
+    {
         return false;
     }
 
     curl_slist_free_all(requestHeaders);
 
     nlohmann::json responseDataJson = nlohmann::json::parse(responseData);
-    if (!responseDataJson.is_object()) {
+    if (!responseDataJson.is_object())
+    {
         std::string reason = std::string("OsuWrapper::getUser - responseDataJson is not an object! responseData=").append(responseData);
         throw std::runtime_error(reason);
     }
     
-    try {
+    try
+    {
         user.userID = userID;
         user.username = responseDataJson.at("username").get<std::string>();
         std::string countryCodeStr = responseDataJson.at("country_code").get<std::string>();
@@ -226,7 +246,9 @@ bool OsuWrapper::getUser(UserID userID, DosuUser& user)
                                         .at("data")[1]
                                         .get<uint32_t>();
         
-    } catch (const std::exception& e) {
+    }
+    catch (const std::exception& e)
+    {
         std::string reason = std::string("OsuWrapper::getUser - could not access responseDataJson fields! responseData=").append(responseData);
         throw std::out_of_range(reason);
     }
@@ -242,49 +264,62 @@ bool OsuWrapper::getUser(UserID userID, DosuUser& user)
  */
 bool OsuWrapper::makeRequest()
 {
-    if (!m_curlHandle) {
+    if (!m_curlHandle)
+    {
         std::string reason = "OsuWrapper::makeRequest - m_curlHandle does not exist!";
         throw std::runtime_error(reason);
     }
 
     size_t retries = 0;
 
-    while (true) {
+    while (true)
+    {
         long httpCode = 0;
 
         int delayMs = m_apiCooldownMs;
         std::this_thread::sleep_for(std::chrono::milliseconds(delayMs));
         CURLcode response = curl_easy_perform(m_curlHandle);
 
-        if (response == CURLE_OK) {
+        if (response == CURLE_OK)
+        {
             curl_easy_getinfo(m_curlHandle, CURLINFO_RESPONSE_CODE, &httpCode);
-        } else {
+        }
+        else
+        {
             std::cout << "OsuWrapper::makeRequest - request failed; got CURLcode " << std::to_string(response) << std::endl;
             return false;
         }
 
-        // 200 OK
-        if (httpCode == 200) {
+        if (httpCode == 200) // 200 OK
+        {
             return true;
-        // 401 Unauthorized - refresh token
-        } else if (httpCode == 401) {
+        }
+        else if (httpCode == 401) // 401 Unauthorized - refresh token
+        {
             updateToken();
-        // 404 Not Found
-        } else if (httpCode == 404) {
+        }
+        else if (httpCode == 404) // 404 Not Found
+        {
             return false;
-        // 429 Too Many Requests / 5XX Internal Server Error - increase wait time
-        } else if ((httpCode == 429) || (std::to_string(httpCode)[0] == '5')) {
-            if (delayMs >= 64000) {
+        }
+        else if ((httpCode == 429) || (std::to_string(httpCode)[0] == '5')) // 429 Too Many Requests / 5XX Internal Server Error - increase wait time
+        {
+            if (delayMs >= 64000)
+            {
                 double offset = ((double)rand() / RAND_MAX) * 1000;
                 delayMs = 64000 + std::round(offset);
-            } else {
+            }
+            else
+            {
                 double offset = (double)rand() / RAND_MAX;
                 delayMs = (std::pow(2, retries) + offset) * 1000;
             }
 
             std::cout << "OsuWrapper::makeRequest - request failed; retrying in " << std::to_string(delayMs) << "ms..." << std::endl;
             ++retries;
-        } else {
+        }
+        else
+        {
             std::cout << "OsuWrapper::makeRequest - received unhandled response code " << std::to_string(httpCode) << std::endl;
             return false;
         }
@@ -293,7 +328,7 @@ bool OsuWrapper::makeRequest()
 
 /**
  * Write callback function for CURL requests.
-*/
+ */
 size_t OsuWrapper::curlWriteCallback(void* contents, size_t size, size_t nmemb, std::string* response) 
 {
     size_t totalSize = size * nmemb;
