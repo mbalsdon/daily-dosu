@@ -11,6 +11,8 @@ public:
     static std::string discordBotToken;
     static std::string osuClientID;
     static std::string osuClientSecret;
+    static std::string osuClientRedirectURI;
+    static int osuApiCooldownMs;
 };
 
 #endif /* __DOSU_CONFIG_H__ */
