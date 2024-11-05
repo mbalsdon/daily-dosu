@@ -2,69 +2,69 @@
 #include "Bot.h"
 #include "DosuConfig.h"
 #include "DailyJob.h"
+#include "ScrapePlayers.h"
 
 #include <iostream>
 #include <string>
 #include <functional>
-
-
 #include <thread>
 #include <chrono>
-void test()
-{
-    std::cout << "Hello world!" << std::endl;
-    std::this_thread::sleep_for(std::chrono::seconds(3));
-}
+#include <filesystem>
 
 /**
  * Entrypoint.
- * TODO: impl
  */
 int main(int argc, char const *argv[])
 {
-    // TODO: Dynamic filepath
-    DosuConfig::load("/home/mathew/dev/daily-dosu/dosu_config.json");
+    // Load environment variables
+    std::filesystem::path rootDir = std::filesystem::path(__FILE__).parent_path().parent_path();
+    std::filesystem::path configPath = rootDir / k_configFileName;
+    if (!std::filesystem::exists(configPath))
+    {
+        // FUTURE: Setup tool to create a config?
+        std::cout << "Cannot find " << configPath << "! Exiting..." << std::endl;
+        return 1;
+    }
+
+    DosuConfig::load(configPath);
 
     // Start bot
     Bot bot(DosuConfig::discordBotToken);
     std::thread botThread(&Bot::start, &bot);
 
     // Give bot some time to start
-    std::this_thread::sleep_for(std::chrono::seconds(10));
+    std::this_thread::sleep_for(std::chrono::seconds(7));
 
     // Start jobs
-    DailyJob job(12, "myJob", test, [&bot]() { bot.todoRemoveMeCallback(); });
+    int hour = 0;
+    DailyJob job(hour, "scrapePlayers", scrapePlayers, [&bot, hour]() { bot.scrapePlayersCallback(hour); });
     std::thread jobThread(&DailyJob::start, &job);
 
     botThread.join();
     jobThread.join();
 
     return 0;
-
-    // std::string clientID = DosuConfig::osuClientID;
-    // std::string clientSecret = DosuConfig::osuClientSecret;
-    // int apiCooldownMs = DosuConfig::osuApiCooldownMs;
-    
-    // OsuWrapper osu(clientID, clientSecret, apiCooldownMs);
-
-    // DosuUser user;
-    // UserID id = 6385683;
-    // osu.getUser(id, user);
-    // std::cout << user.username << std::endl;
-
-    // UserID userIDs[50];
-    // bool succ = osu.getRankingIDs(0, userIDs, 50);
-    // for (int i = 0; i < 50; ++i) {
-    //     std::cout << userIDs[i] << " ";
-    // }
-    // std::cout << std::endl;
 }
 
-// TODO: job impl, bot callback impl
-// // store in json -> callback reads from json his ass is not using sqlite
-// TODO: error behaviour when bot/job breaks??
-// TODO: caching for job?
-// TODO: per-server behaviour; start/stop -> do/dont execute callback
-// TODO: go thru todos (readme, comments, etc)
+// TODO: bot callback impl
+// // top 10 increase
+// // top 10 decrease
+// // split by 2dig, 3dig, 4dig (button)
+// // ^^^^^^^^ scrapeplayers adds to compact file (big users.json stays)
+// // ^^^^^^^^ bot ideally not sorting/filtering anything
+// TODO: dailyjob try/catch job&bot functions try {m_job;} catch() {...}
+// // test disconnecting internet during scrapePlayers, while bot is running, before callback message is sent, etc.
+
+// TODO: per-server behaviour; start/stop -> do/dont execute callback (save server id map???)
+// // embed author pfp (3rd field) = server pfp
+// TODO: command that sends raw users.json
+// TODO: settings (country, only rankup/rankdown, ...)
+// // setting options returns sample display
+// // scrapePlayers prebuilds files (CA.json, EE.json, etc)
+// TODO: go thru TODOs (readme, comments, etc)
 // TODO: release
-// TODO: callback filter options, sorting, etc?
+
+// TODO: email peppy ratelimit increase
+// TODO: userids should be saved incase of error; save data every X retrievals and start from there on failure?
+// TODO: sussy detector (< X hrs and > Y increase)
+// TODO: go through FUTUREs/FIXMEs

@@ -96,7 +96,7 @@ void OsuWrapper::updateToken()
 
     try
     {
-        m_accessToken = responseDataJson.at("access_token").get<std::string>();
+        m_accessToken = responseDataJson.at("access_token").get<OAuthToken>();
     }
     catch (const std::exception& e)
     {
@@ -112,18 +112,20 @@ void OsuWrapper::updateToken()
  * Data is returned in userIDs.
  * Returns true if request succeeds, false if otherwise.
  */
-bool OsuWrapper::getRankingIDs(Page page, UserID userIDs[], size_t numIDs) 
+bool OsuWrapper::getRankingIDs(Page page, std::vector<UserID>& userIDs, size_t numIDs)
 {
-    std::cout << "OsuWrapper::getRankingIDs - requesting ranking data from osu!API..." << std::endl;
+    page += 1;
 
-    if (page > 200)
+    std::cout << "OsuWrapper::getRankingIDs - requesting page " << static_cast<int>(page) << " ranking data from osu!API..." << std::endl;
+
+    if (page > k_getRankingIDMaxPage)
     {
-        std::string reason = std::string("OsuWrapper::getRankingIDs - page cannot be greater than 200! page=").append(std::to_string(page));
+        std::string reason = std::string("OsuWrapper::getRankingIDs - page cannot be greater than k_getRankingIDMaxPage! page=").append(std::to_string(page));
         throw std::invalid_argument(reason);
     }
-    if (numIDs > 50)
+    if (numIDs > k_getRankingIDMaxNumIDs)
     {
-        std::string reason = std::string("OsuWrapper::getRankingIDs - numIDs cannot be greater than 50! numIDs=").append(std::to_string(numIDs));
+        std::string reason = std::string("OsuWrapper::getRankingIDs - numIDs cannot be greater than k_getRankingIDMaxNumIDs! numIDs=").append(std::to_string(numIDs));
         throw std::invalid_argument(reason);
     }
     if (!m_curlHandle)
@@ -172,8 +174,8 @@ bool OsuWrapper::getRankingIDs(Page page, UserID userIDs[], size_t numIDs)
             UserID userID = responseDataJson.at("ranking")[i]
                                             .at("user")
                                             .at("id")
-                                            .get<uint32_t>();
-            userIDs[i] = userID;
+                                            .get<UserID>();
+            userIDs.push_back(userID);
         }
         catch (const std::exception& e)
         {
@@ -234,18 +236,14 @@ bool OsuWrapper::getUser(UserID userID, DosuUser& user)
     try
     {
         user.userID = userID;
-        user.username = responseDataJson.at("username").get<std::string>();
-        std::string countryCodeStr = responseDataJson.at("country_code").get<std::string>();
-        std::strncpy(user.countryCode, countryCodeStr.c_str(), sizeof(user.countryCode) - 1);
-        user.countryCode[sizeof(user.countryCode) - 1] = '\0';
-        user.pfpLink = responseDataJson.at("avatar_url").get<std::string>();
-        user.currentRank = responseDataJson.at("rank_history")
-                                        .at("data")[0]
-                                        .get<uint32_t>();
-        user.yesterdayRank = responseDataJson.at("rank_history")
-                                        .at("data")[1]
-                                        .get<uint32_t>();
-        
+        user.username = responseDataJson.at("username").get<Username>();
+        user.countryCode = responseDataJson.at("country_code").get<CountryCode>();
+        user.pfpLink = responseDataJson.at("avatar_url").get<ProfilePicture>();
+        user.currentRank = responseDataJson.at("rank_history").at("data")[89].get<Rank>();
+        user.yesterdayRank = responseDataJson.at("rank_history").at("data")[88].get<Rank>();
+        user.hoursPlayed = responseDataJson.at("statistics").at("play_time").get<uint64_t>() / 3600; // FIXME: round instead of truncate
+        user.performancePoints = responseDataJson.at("statistics").at("pp").get<PerformancePoints>();
+        user.accuracy = responseDataJson.at("statistics").at("hit_accuracy").get<Accuracy>();
     }
     catch (const std::exception& e)
     {
