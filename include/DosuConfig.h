@@ -3,10 +3,14 @@
 
 #include <dpp/nlohmann/json.hpp>
 
+#include <filesystem>
+
+const std::string k_configFileName = "dosu_config.json";
+
 class DosuConfig 
 {
 public:
-    static void load(const std::string& filePath);
+    static void load(const std::filesystem::path& filePath);
 
     static std::string discordBotToken;
     static std::string osuClientID;

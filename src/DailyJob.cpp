@@ -28,7 +28,7 @@ std::chrono::minutes minutesUntil(int hour)
 } /* namespace Detail */
 
 /**
- * TODO: desc
+ * DailyJob constructor.
  */
 DailyJob::DailyJob(int hour, std::string name, void (*job)(), std::function<void()> jobCallback)
 {
@@ -51,7 +51,9 @@ DailyJob::DailyJob(int hour, std::string name, void (*job)(), std::function<void
 }
 
 /**
- * TODO: desc
+ * Starts the job scheduler.
+ * Runs in a detached thread every day at the specified hour (system time).
+ * If a callback is specified, it will run after each job completion.
  */
 void DailyJob::start()
 {
@@ -61,17 +63,21 @@ void DailyJob::start()
         {
             while (true)
             {
-                // TODO: remove
-                // m_job();
-                // m_jobCallback();
-
+                // Sleep until next scheduled run
                 std::chrono::minutes minutesUntilNextRun = Detail::minutesUntil(m_hour);
                 double hoursUntilNextRun = std::chrono::duration<double, std::ratio<60>>(minutesUntilNextRun).count() / 60.0;
                 std::cout << "DailyJob::" << m_name << " - sleeping for " << hoursUntilNextRun << " hours before running again..." << std::endl;
                 std::this_thread::sleep_for(minutesUntilNextRun);
 
+                // Run job, reporting time taken (not high precision)
                 std::cout << "DailyJob::" << m_name << " - beginning execution..." << std::endl;
+                auto startTime = std::chrono::system_clock::now();
                 m_job();
+                auto endTime = std::chrono::system_clock::now();
+                auto duration = std::chrono::duration_cast<std::chrono::minutes>(endTime - startTime);
+                std::cout << "DailyJob::" << m_name << " - job finished execution! Time elapsed: " << duration.count() << " minutes" << std::endl;
+
+                // Execute callback if it exists
                 if (m_jobCallback)
                 {
                     std::cout << "DailyJob::" << m_name << " - executing job callback..." << std::endl;
