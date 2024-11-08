@@ -46,7 +46,7 @@ struct DosuUser
     Rank currentRank = 0;
     Rank yesterdayRank = 0;
     PerformancePoints performancePoints = 0;
-    Accuracy accuracy = 0.f;
+    Accuracy accuracy = 0.;
 
     bool isEmpty() const { return userID == 0; }
     void clear() { *this = DosuUser{}; }

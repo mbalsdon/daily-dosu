@@ -65,7 +65,7 @@ void DailyJob::start()
             {
                 // Sleep until next scheduled run
                 std::chrono::minutes minutesUntilNextRun = Detail::minutesUntil(m_hour);
-                double hoursUntilNextRun = std::chrono::duration<double, std::ratio<60>>(minutesUntilNextRun).count() / 60.0;
+                double hoursUntilNextRun = std::chrono::duration<double, std::ratio<60>>(minutesUntilNextRun).count() / 60.;
                 std::cout << "DailyJob::" << m_name << " - sleeping for " << hoursUntilNextRun << " hours before running again..." << std::endl;
                 std::this_thread::sleep_for(minutesUntilNextRun);
 
