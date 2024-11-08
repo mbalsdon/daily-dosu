@@ -22,6 +22,8 @@ typedef double Accuracy;
 
 typedef double RankChangeRatio;
 
+const int k_curlRetryWaitMs = 30000;
+
 constexpr size_t k_getRankingIDMaxNumIDs = 50;
 constexpr size_t k_getRankingIDMaxPage = 200;
 

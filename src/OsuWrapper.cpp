@@ -71,7 +71,7 @@ void OsuWrapper::updateToken()
     if (response != CURLE_OK)
     {
         curl_easy_cleanup(tokenCurlHandle);
-        std::string reason = std::string("OsuWrapper::updateToken - request failed! response=").append(std::to_string(response));
+        std::string reason = std::string("OsuWrapper::updateToken - request failed; got CURLcode ").append(std::to_string(response));
         throw std::runtime_error(reason);
     }
 
@@ -80,7 +80,7 @@ void OsuWrapper::updateToken()
     if (httpCode != 200)
     {
         curl_easy_cleanup(tokenCurlHandle);
-        std::string reason = std::string("OsuWrapper::updateToken - request failed! httpCode=").append(std::to_string(httpCode));
+        std::string reason = std::string("OsuWrapper::updateToken - request failed; got HTTP code ").append(std::to_string(httpCode));
         throw std::runtime_error(reason);
     }
 
@@ -255,8 +255,11 @@ bool OsuWrapper::getUser(UserID userID, DosuUser& user)
 }
 
 /**
- * Make CURL request. 
- * If request gets ratelimited or a server error occurs, waits according to [exponential backoff](https://cloud.google.com/iot/docs/how-tos/exponential-backoff).
+ * WARNING: It is possible for this function to retry forever!
+ *
+ * Make CURL request.
+ * If request gets ratelimited or a server error occurs, waits according to [exponential backoff](https://cloud.google.com/iot/docs/how-tos/exponential-backoff) then retries.
+ * If the request itself fails (e.g. no internet connection), waits for a while and retries.
  * Status code logic is implemented according to [osu-web](https://github.com/ppy/osu-web/blob/master/resources/lang/en/layout.php).
  * Return true if request succeeds, false if not.
  */
@@ -269,25 +272,33 @@ bool OsuWrapper::makeRequest()
     }
 
     size_t retries = 0;
-
+    int delayMs = m_apiCooldownMs;
     while (true)
     {
         long httpCode = 0;
 
-        int delayMs = m_apiCooldownMs;
         std::this_thread::sleep_for(std::chrono::milliseconds(delayMs));
         CURLcode response = curl_easy_perform(m_curlHandle);
 
-        if (response == CURLE_OK)
+        // Handle CURL code
+        if (response == CURLE_OK) // Server responded
         {
             curl_easy_getinfo(m_curlHandle, CURLINFO_RESPONSE_CODE, &httpCode);
         }
-        else
+        else // Something bad happened, ideally connectivity issues
         {
-            std::cout << "OsuWrapper::makeRequest - request failed; got CURLcode " << std::to_string(response) << std::endl;
-            return false;
+            int waitMs = k_curlRetryWaitMs - delayMs;
+            if (waitMs < 0)
+            {
+                waitMs = 0;
+            }
+
+            std::cout << "OsuWrapper::makeRequest - request failed; got CURLcode " << std::to_string(response) << ". Retrying in " << waitMs + delayMs << "ms..." << std::endl;
+            std::this_thread::sleep_for(std::chrono::milliseconds(waitMs));
+            continue;
         }
 
+        // Handle HTTP code
         if (httpCode == 200) // 200 OK
         {
             return true;
@@ -318,7 +329,7 @@ bool OsuWrapper::makeRequest()
         }
         else
         {
-            std::cout << "OsuWrapper::makeRequest - received unhandled response code " << std::to_string(httpCode) << std::endl;
+            std::cout << "OsuWrapper::makeRequest - received unhandled HTTP code " << std::to_string(httpCode) << std::endl;
             return false;
         }
     }

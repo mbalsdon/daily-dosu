@@ -46,11 +46,6 @@ int main(int argc, char const *argv[])
     return 0;
 }
 
-// TODO: dailyjob try/catch job&bot functions try {m_job;} catch() {...}
-// // test disconnecting internet during scrapePlayers, while bot is running, before callback message is sent, etc.
-// // NOTE: json .at() throws an exception
-// // ^^^^^^^^ new commits
-
 // TODO: per-server behaviour; start/stop -> do/dont execute callback (save server id map???)
 // // embed author pfp (3rd field) = server pfp
 // // ^^^^^^^^ new commits
@@ -64,11 +59,11 @@ int main(int argc, char const *argv[])
 // TODO: help command
 // TODO: bot button caching? i.e. calc and store all embeds for each rank range
 
-// TODO: go thru TODOs (readme, comments, etc)
-// TODO: any cleanups?
+// TODO: release
+// // go thru TODOs (readme, comments, etc)
+// // any cleanups?
 // // rank range enum to key, in bot?
 // // ...
-// TODO: release
 // // ^^^^^^^^ new commits
 
 
@@ -76,3 +71,7 @@ int main(int argc, char const *argv[])
 // TODO: userids should be saved incase of error; save data every X retrievals and start from there on failure?
 // TODO: sussy detector (< X hrs and > Y increase)
 // TODO: go through FUTUREs/FIXMEs
+
+// TODO: new job: highest play today
+// // https://github.com/Ameobea/osutrack-api
+// // "Get the best plays by pp for all users in a given mode"
