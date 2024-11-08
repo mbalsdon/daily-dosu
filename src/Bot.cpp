@@ -252,25 +252,25 @@ dpp::embed Bot::createScrapePlayersEmbed(RankRange rankRange, int hour, nlohmann
     if (rankRange == RankRange::First)
     {
         embed.set_color(k_firstRangeColor);
-        description << "### :up_arrow: Largest rank increases (#1 - #" << k_firstRangeMax << "):\n";
+        description << "## :up_arrow: Largest rank increases (#1 - #" << k_firstRangeMax << "):\n";
         addPlayersToDescription(description, jsonUsersCompact, rankRange, true);
-        description << "### :down_arrow: Largest rank decreases (#1 - #" << k_firstRangeMax << "):\n";
+        description << "## :down_arrow: Largest rank decreases (#1 - #" << k_firstRangeMax << "):\n";
         addPlayersToDescription(description, jsonUsersCompact, rankRange, false);
     }
     else if (rankRange == RankRange::Second)
     {
         embed.set_color(k_secondRangeColor);
-        description << "### :up_arrow: Largest rank increases (#" << k_firstRangeMax + 1 << " - #" << k_secondRangeMax << "):\n";
+        description << "## :up_arrow: Largest rank increases (#" << k_firstRangeMax + 1 << " - #" << k_secondRangeMax << "):\n";
         addPlayersToDescription(description, jsonUsersCompact, rankRange, true);
-        description << "### :down_arrow: Largest rank decreases (#" << k_firstRangeMax + 1 << " - #" << k_secondRangeMax << "):\n";
+        description << "## :down_arrow: Largest rank decreases (#" << k_firstRangeMax + 1 << " - #" << k_secondRangeMax << "):\n";
         addPlayersToDescription(description, jsonUsersCompact, rankRange, false);
     }
     else
     {
         embed.set_color(k_thirdRangeColor);
-        description << "### :up_arrow: Largest rank increases (#" << k_secondRangeMax + 1 << " - #" << k_thirdRangeMax << "):\n";
+        description << "## :up_arrow: Largest rank increases (#" << k_secondRangeMax + 1 << " - #" << k_thirdRangeMax << "):\n";
         addPlayersToDescription(description, jsonUsersCompact, rankRange, true);
-        description << "### :down_arrow: Largest rank decreases (#" << k_secondRangeMax + 1 << " - #" << k_thirdRangeMax << "):\n";
+        description << "## :down_arrow: Largest rank decreases (#" << k_secondRangeMax + 1 << " - #" << k_thirdRangeMax << "):\n";
         addPlayersToDescription(description, jsonUsersCompact, rankRange, false);
     }
 
