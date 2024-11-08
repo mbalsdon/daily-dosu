@@ -8,6 +8,7 @@
 #include <vector>
 #include <filesystem>
 #include <fstream>
+#include <iterator>
 
 namespace Detail
 {
@@ -18,7 +19,7 @@ RankChangeRatio getRankChangeRatio(DosuUser user)
 
     if (yesterdayRank < currentRank) // Rank decreased (e.g. #5 -> #10)
     {
-        return 0.f - (static_cast<RankChangeRatio>(currentRank - yesterdayRank) / currentRank);
+        return 0. - (static_cast<RankChangeRatio>(currentRank - yesterdayRank) / currentRank);
     }
     else // Rank increased (e.g. #10 -> #5)
     {
@@ -86,7 +87,7 @@ void scrapePlayers()
         [](const nlohmann::json& a, const nlohmann::json& b) { return a[k_rankChangeRatioKey] > b[k_rankChangeRatioKey]; }
     );
 
-    // Store data
+    // Store data (full dataset)
     std::filesystem::path rootDir = std::filesystem::path(__FILE__).parent_path().parent_path();
 
     std::filesystem::path dataDir = rootDir / k_dataDirName;
@@ -95,15 +96,99 @@ void scrapePlayers()
         std::filesystem::create_directory(dataDir);
     }
 
-    std::filesystem::path dataFilePath = dataDir / k_jsonFileName;
-    std::ofstream jsonFile(dataFilePath, std::ios::trunc);
-    if (!jsonFile.is_open())
+    std::filesystem::path usersFullFilePath = dataDir / k_usersFullFileName;
+    std::ofstream usersFullJsonFile(usersFullFilePath, std::ios::trunc);
+    if (!usersFullJsonFile.is_open())
     {
-        std::string reason = std::string("scrapePlayers - failed to open ").append(dataFilePath.string());
+        std::string reason = std::string("scrapePlayers - failed to open ").append(usersFullFilePath.string());
         throw std::runtime_error(reason);
     }
 
-    jsonFile << jsonUsers.dump(2) << std::endl;
-    jsonFile.close();
-    std::cout << "scrapePlayers - finished writing user data to " << dataFilePath.string() << "!" << std::endl;
+    usersFullJsonFile << jsonUsers.dump(2) << std::endl;
+    usersFullJsonFile.close();
+    std::cout << "scrapePlayers - finished writing user data to " << usersFullFilePath.string() << "!" << std::endl;
+
+    // Get top users from each rank range
+    nlohmann::json topUsersFirstRangeJson = nlohmann::json::array();
+    nlohmann::json topUsersSecondRangeJson = nlohmann::json::array();
+    nlohmann::json topUsersThirdRangeJson = nlohmann::json::array();
+    for (const auto& jsonUser : jsonUsers)
+    {
+        Rank userRank = jsonUser.at(k_currentRankKey).get<Rank>();
+
+        if ((topUsersFirstRangeJson.size() < k_numDisplayUsers) &&
+            (userRank < k_firstRangeMax))
+        {
+            topUsersFirstRangeJson.push_back(jsonUser);
+        }
+        else if ((topUsersSecondRangeJson.size() < k_numDisplayUsers) &&
+                 (userRank >= k_firstRangeMax) &&
+                 (userRank < k_secondRangeMax))
+        {
+            topUsersSecondRangeJson.push_back(jsonUser);
+        }
+        else if ((topUsersThirdRangeJson.size() < k_numDisplayUsers) &&
+                 (userRank >= k_secondRangeMax) &&
+                 (userRank < k_thirdRangeMax))
+        {
+            topUsersThirdRangeJson.push_back(jsonUser);
+        }
+    }
+
+    // Get bottom users from each rank range
+    nlohmann::json bottomUsersFirstRangeJson = nlohmann::json::array();
+    nlohmann::json bottomUsersSecondRangeJson = nlohmann::json::array();
+    nlohmann::json bottomUsersThirdRangeJson = nlohmann::json::array();
+    for (auto it = jsonUsers.rbegin(); it != jsonUsers.rend(); ++it)
+    {
+        const auto& jsonUser = *it;
+        Rank userRank = jsonUser.at(k_currentRankKey).get<Rank>();
+
+        if ((bottomUsersFirstRangeJson.size() < k_numDisplayUsers) &&
+            (userRank < k_firstRangeMax))
+        {
+            bottomUsersFirstRangeJson.push_back(jsonUser);
+        }
+        else if ((bottomUsersSecondRangeJson.size() < k_numDisplayUsers) &&
+                 (userRank >= k_firstRangeMax) &&
+                 (userRank < k_secondRangeMax))
+        {
+            bottomUsersSecondRangeJson.push_back(jsonUser);
+        }
+        else if ((bottomUsersThirdRangeJson.size() < k_numDisplayUsers) &&
+                 (userRank >= k_secondRangeMax) &&
+                 (userRank < k_thirdRangeMax))
+        {
+            bottomUsersThirdRangeJson.push_back(jsonUser);
+        }
+    }
+
+    // Build JSON object (compact dataset)
+    nlohmann::json compactUsersJson = {
+        {k_firstRangeKey, {
+            {k_topUsersKey, topUsersFirstRangeJson},
+            {k_bottomUsersKey, bottomUsersFirstRangeJson}
+        }},
+        {k_secondRangeKey, {
+            {k_topUsersKey, topUsersSecondRangeJson},
+            {k_bottomUsersKey, bottomUsersSecondRangeJson}
+        }},
+        {k_thirdRangeKey, {
+            {k_topUsersKey, topUsersThirdRangeJson},
+            {k_bottomUsersKey, bottomUsersThirdRangeJson}
+        }}
+    };
+
+    // Store data (compact dataset)
+    std::filesystem::path usersCompactFilePath = dataDir / k_usersCompactFileName;
+    std::ofstream usersCompactJsonFile(usersCompactFilePath, std::ios::trunc);
+    if (!usersCompactJsonFile.is_open())
+    {
+        std::string reason = std::string("scrapePlayers - failed to open ").append(usersCompactFilePath.string());
+        throw std::runtime_error(reason);
+    }
+
+    usersCompactJsonFile << compactUsersJson.dump(2) << std::endl;
+    usersCompactJsonFile.close();
+    std::cout << "scrapePlayers - finished writing user data to " << usersCompactFilePath.string() << "!" << std::endl;
 }

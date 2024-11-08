@@ -46,23 +46,31 @@ int main(int argc, char const *argv[])
     return 0;
 }
 
-// TODO: bot callback impl
-// // top 10 increase
-// // top 10 decrease
-// // split by 2dig, 3dig, 4dig (button)
-// // ^^^^^^^^ scrapeplayers adds to compact file (big users.json stays)
-// // ^^^^^^^^ bot ideally not sorting/filtering anything
 // TODO: dailyjob try/catch job&bot functions try {m_job;} catch() {...}
 // // test disconnecting internet during scrapePlayers, while bot is running, before callback message is sent, etc.
+// // NOTE: json .at() throws an exception
+// // ^^^^^^^^ new commits
 
 // TODO: per-server behaviour; start/stop -> do/dont execute callback (save server id map???)
 // // embed author pfp (3rd field) = server pfp
+// // ^^^^^^^^ new commits
+
 // TODO: command that sends raw users.json
 // TODO: settings (country, only rankup/rankdown, ...)
 // // setting options returns sample display
 // // scrapePlayers prebuilds files (CA.json, EE.json, etc)
+// // ^^^^^^^^ new commits
+
+// TODO: help command
+// TODO: bot button caching? i.e. calc and store all embeds for each rank range
+
 // TODO: go thru TODOs (readme, comments, etc)
+// TODO: any cleanups?
+// // rank range enum to key, in bot?
+// // ...
 // TODO: release
+// // ^^^^^^^^ new commits
+
 
 // TODO: email peppy ratelimit increase
 // TODO: userids should be saved incase of error; save data every X retrievals and start from there on failure?
