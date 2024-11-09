@@ -87,7 +87,7 @@ void scrapePlayers()
         [](const nlohmann::json& a, const nlohmann::json& b) { return a[k_rankChangeRatioKey] > b[k_rankChangeRatioKey]; }
     );
 
-    // Store data (full dataset)
+    // Store data to disk (full dataset)
     std::filesystem::path rootDir = std::filesystem::path(__FILE__).parent_path().parent_path();
 
     std::filesystem::path dataDir = rootDir / k_dataDirName;
@@ -179,7 +179,7 @@ void scrapePlayers()
         }}
     };
 
-    // Store data (compact dataset)
+    // Store data to disk (compact dataset)
     std::filesystem::path usersCompactFilePath = dataDir / k_usersCompactFileName;
     std::ofstream usersCompactJsonFile(usersCompactFilePath, std::ios::trunc);
     if (!usersCompactJsonFile.is_open())

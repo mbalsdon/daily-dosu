@@ -79,6 +79,7 @@ std::string toHexString(int i)
  */
 Bot::Bot(const std::string& botToken) 
     : m_bot(botToken)
+    , m_serverConfig()
 {}
 
 /**
@@ -99,6 +100,14 @@ void Bot::start()
         {
             cmdPing(event);
         }
+        else if (cmdName == k_cmdSubscribe)
+        {
+            cmdSubscribe(event);
+        }
+        else if (cmdName == k_cmdUnsubscribe)
+        {
+            cmdUnsubscribe(event);
+        }
     });
 
     m_bot.on_ready([this](const dpp::ready_t& event)
@@ -106,6 +115,8 @@ void Bot::start()
         if (dpp::run_once<struct register_bot_commands>())
         {
             m_bot.global_command_create(dpp::slashcommand(k_cmdPing, "Ping pong!", m_bot.me.id));
+            m_bot.global_command_create(dpp::slashcommand(k_cmdSubscribe, "Begin sending daily messages to this channel.", m_bot.me.id));
+            m_bot.global_command_create(dpp::slashcommand(k_cmdUnsubscribe, "Stop sending daily messages to this channel.", m_bot.me.id));
         }
     });
 
@@ -147,6 +158,28 @@ void Bot::cmdPing(const dpp::slashcommand_t& event)
 }
 
 /**
+ * Run the subscribe command.
+ * Adds this channel to the list of channels to send daily messages to.
+ */
+void Bot::cmdSubscribe(const dpp::slashcommand_t& event)
+{
+    dpp::snowflake channelID = event.command.channel_id;
+    m_serverConfig.addChannel(channelID);
+    event.reply("Daily messages have been enabled for this channel.");
+}
+
+/**
+ * Run the unsubscribe command.
+ * Removes this channel to the list of channels to send daily messages to.
+ */
+void Bot::cmdUnsubscribe(const dpp::slashcommand_t& event)
+{
+    dpp::snowflake channelID = event.command.channel_id;
+    m_serverConfig.removeChannel(channelID);
+    event.reply("Daily messages have been disabled for this channel.");
+}
+
+/**
  * Read user data and display it thru a discord embed.
  */
 void Bot::scrapePlayersCallback(int hour)
@@ -157,7 +190,7 @@ void Bot::scrapePlayersCallback(int hour)
         std::cout << "Bot::scrapePlayersCallback - hour is out of bounds; normalizing to " << hour << std::endl;
     }
 
-    // Read data into memory
+    // Read data from disk to memory
     nlohmann::json jsonUsersCompact;
     try
     {
@@ -170,6 +203,7 @@ void Bot::scrapePlayersCallback(int hour)
             throw std::runtime_error(reason);
         }
         jsonUsersCompact = nlohmann::json::parse(jsonFile);
+        jsonFile.close();
     }
     catch (const std::exception& e)
     {
@@ -212,7 +246,13 @@ void Bot::scrapePlayersCallback(int hour)
     message.add_component(actionRow);
 
     message.channel_id = 1001155170777960618;
-    m_bot.message_create(message);
+
+    // Send message to subscriber list
+    for (const auto& channelID : m_serverConfig.getChannelList())
+    {
+        message.channel_id = channelID;
+        m_bot.message_create(message);
+    }
 }
 
 /**
@@ -235,7 +275,7 @@ dpp::embed Bot::createScrapePlayersEmbed(RankRange rankRange, int hour, nlohmann
     }
 
     // Add static embed fields
-    std::string footerText = "Runs every day at " + Detail::toHourString(hour) + "PST"; // FUTURE: clean (use chrono, convert to UTC without offset)
+    std::string footerText = "Runs every day at " + Detail::toHourString(hour) + "PST";
     std::string footerIcon = k_twemojiClockPrefix + Detail::toHexString(Detail::convertTo12Hour(hour) - 1) + k_twemojiClockSuffix;
     dpp::embed embed = dpp::embed()
         .set_author("Here's your daily dose of osu!", "https://github.com/mbalsdon/daily-dosu", "") // zesty ahh bot
@@ -331,6 +371,11 @@ void Bot::addPlayersToDescription(std::stringstream& description, nlohmann::json
     size_t j = 1;
     for (size_t i = 0; i < displayUsersMax; ++i)
     {
+        if (i >= jsonUsers.size())
+        {
+            break;
+        }
+
         nlohmann::json jsonUser = jsonUsers.at(i);
         if (Detail::isJsonUserInvalid(jsonUser))
         {
