@@ -1,10 +1,14 @@
 #ifndef __BOT_H__
 #define __BOT_H__
 
-#include "OsuWrapper.h"
 #include "ServerConfig.h"
+#include "Util.h"
 
 #include <dpp/dpp.h>
+#include <dpp/nlohmann/json.hpp>
+
+#include <string>
+#include <cstdint>
 
 const std::string k_twemojiClockPrefix = "https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f55";
 const std::string k_twemojiClockSuffix = ".png";

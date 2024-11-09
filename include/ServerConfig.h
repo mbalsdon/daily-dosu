@@ -3,13 +3,8 @@
 
 #include <dpp/dpp.h>
 
-#include <string>
 #include <mutex>
 #include <unordered_set>
-
-const std::string k_serverConfigFileName = "server_config.json";
-
-const std::string k_serverConfigChannelsKey = "channels";
 
 class ServerConfig
 {

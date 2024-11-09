@@ -1,10 +1,8 @@
 #ifndef __DAILY_JOB_H__
 #define __DAILY_JOB_H__
 
-#include <cstdint>
 #include <string>
 #include <functional>
-#include <memory>
 
 class DailyJob
 {

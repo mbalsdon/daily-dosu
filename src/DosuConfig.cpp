@@ -1,5 +1,7 @@
 #include "DosuConfig.h"
 
+#include <nlohmann/json.hpp>
+
 #include <fstream>
 
 std::string DosuConfig::discordBotToken;
