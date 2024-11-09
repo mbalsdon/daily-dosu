@@ -1,11 +1,8 @@
 #ifndef __DOSU_CONFIG_H__
 #define __DOSU_CONFIG_H__
 
-#include <dpp/nlohmann/json.hpp>
-
 #include <filesystem>
-
-const std::string k_configFileName = "dosu_config.json";
+#include <string>
 
 class DosuConfig 
 {

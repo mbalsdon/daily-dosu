@@ -6,7 +6,6 @@
 
 #include <iostream>
 #include <vector>
-#include <filesystem>
 #include <fstream>
 #include <iterator>
 
@@ -29,7 +28,9 @@ RankChangeRatio getRankChangeRatio(DosuUser user)
 } /* namespace Detail */
 
 /**
- * Retrieves player data from the osu!API and stores it.
+ * WARNING: This function is not thread-safe!
+ *
+ * Retrieves player data from the osu!API and stores it to disk.
  * Sorts by rank gain ratio, the main metric we're interested in.
  * For example, going from rank #1,000 to #500 means a 100% increase, and going from rank #5 to #10 means a 100% decrease.
  * The file store is overwritten each time this function completes.
@@ -37,7 +38,7 @@ RankChangeRatio getRankChangeRatio(DosuUser user)
 void scrapePlayers()
 {
     OsuWrapper osu(DosuConfig::osuClientID, DosuConfig::osuClientSecret, DosuConfig::osuApiCooldownMs);
-    size_t numIDs = k_getRankingIDMaxPage * k_getRankingIDMaxNumIDs;
+    std::size_t numIDs = k_getRankingIDMaxPage * k_getRankingIDMaxNumIDs;
 
     // Grab user IDs
     std::vector<UserID> userIDs;
@@ -88,25 +89,16 @@ void scrapePlayers()
     );
 
     // Store data to disk (full dataset)
-    std::filesystem::path rootDir = std::filesystem::path(__FILE__).parent_path().parent_path();
-
-    std::filesystem::path dataDir = rootDir / k_dataDirName;
-    if (!std::filesystem::exists(dataDir))
-    {
-        std::filesystem::create_directory(dataDir);
-    }
-
-    std::filesystem::path usersFullFilePath = dataDir / k_usersFullFileName;
-    std::ofstream usersFullJsonFile(usersFullFilePath, std::ios::trunc);
+    std::ofstream usersFullJsonFile(k_usersFullFilePath, std::ios::trunc);
     if (!usersFullJsonFile.is_open())
     {
-        std::string reason = std::string("scrapePlayers - failed to open ").append(usersFullFilePath.string());
+        std::string reason = std::string("scrapePlayers - failed to open ").append(k_usersFullFilePath.string());
         throw std::runtime_error(reason);
     }
 
     usersFullJsonFile << jsonUsers.dump(2) << std::endl;
     usersFullJsonFile.close();
-    std::cout << "scrapePlayers - finished writing user data to " << usersFullFilePath.string() << "!" << std::endl;
+    std::cout << "scrapePlayers - finished writing user data to " << k_usersFullFilePath.string() << "!" << std::endl;
 
     // Get top users from each rank range
     nlohmann::json topUsersFirstRangeJson = nlohmann::json::array();
@@ -180,15 +172,14 @@ void scrapePlayers()
     };
 
     // Store data to disk (compact dataset)
-    std::filesystem::path usersCompactFilePath = dataDir / k_usersCompactFileName;
-    std::ofstream usersCompactJsonFile(usersCompactFilePath, std::ios::trunc);
+    std::ofstream usersCompactJsonFile(k_usersCompactFilePath, std::ios::trunc);
     if (!usersCompactJsonFile.is_open())
     {
-        std::string reason = std::string("scrapePlayers - failed to open ").append(usersCompactFilePath.string());
+        std::string reason = std::string("scrapePlayers - failed to open ").append(k_usersCompactFilePath.string());
         throw std::runtime_error(reason);
     }
 
     usersCompactJsonFile << compactUsersJson.dump(2) << std::endl;
     usersCompactJsonFile.close();
-    std::cout << "scrapePlayers - finished writing user data to " << usersCompactFilePath.string() << "!" << std::endl;
+    std::cout << "scrapePlayers - finished writing user data to " << k_usersCompactFilePath.string() << "!" << std::endl;
 }

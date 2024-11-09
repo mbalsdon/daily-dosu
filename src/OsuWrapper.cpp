@@ -3,7 +3,6 @@
 #include <dpp/nlohmann/json.hpp>
 
 #include <iostream>
-#include <string>
 #include <thread>
 #include <chrono>
 #include <cmath>
@@ -112,7 +111,7 @@ void OsuWrapper::updateToken()
  * Data is returned in userIDs.
  * Returns true if request succeeds, false if otherwise.
  */
-bool OsuWrapper::getRankingIDs(Page page, std::vector<UserID>& userIDs, size_t numIDs)
+bool OsuWrapper::getRankingIDs(Page page, std::vector<UserID>& userIDs, std::size_t numIDs)
 {
     page += 1;
 
@@ -167,7 +166,7 @@ bool OsuWrapper::getRankingIDs(Page page, std::vector<UserID>& userIDs, size_t n
         throw std::runtime_error(reason);
     }
 
-    for (size_t i = 0; i < numIDs; ++i)
+    for (std::size_t i = 0; i < numIDs; ++i)
     {
         try
         {
@@ -271,7 +270,7 @@ bool OsuWrapper::makeRequest()
         throw std::runtime_error(reason);
     }
 
-    size_t retries = 0;
+    std::size_t retries = 0;
     int delayMs = m_apiCooldownMs;
     while (true)
     {
@@ -338,9 +337,9 @@ bool OsuWrapper::makeRequest()
 /**
  * Write callback function for CURL requests.
  */
-size_t OsuWrapper::curlWriteCallback(void* contents, size_t size, size_t nmemb, std::string* response) 
+std::size_t OsuWrapper::curlWriteCallback(void* contents, std::size_t size, std::size_t nmemb, std::string* response) 
 {
-    size_t totalSize = size * nmemb;
+    std::size_t totalSize = size * nmemb;
     response->append(static_cast<char*>(contents), totalSize);
     return totalSize;
 }

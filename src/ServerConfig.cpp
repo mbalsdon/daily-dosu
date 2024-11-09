@@ -1,5 +1,5 @@
 #include "ServerConfig.h"
-#include "ScrapePlayers.h"
+#include "Util.h"
 
 #include <dpp/nlohmann/json.hpp>
 
@@ -23,20 +23,13 @@ void ServerConfig::load()
 
     try
     {
-        std::filesystem::path rootDir = std::filesystem::path(__FILE__).parent_path().parent_path();
-        std::filesystem::path dataDir = rootDir / k_dataDirName;
-        if (!std::filesystem::exists(dataDir))
+        // Create default config if one doesn't exist
+        if (!std::filesystem::exists(k_serverConfigFilePath))
         {
-            std::filesystem::create_directory(dataDir);
-        }
-
-        std::filesystem::path configFilePath = dataDir / k_serverConfigFileName;
-        if (!std::filesystem::exists(configFilePath))
-        {
-            std::ofstream newConfigFile(configFilePath);
+            std::ofstream newConfigFile(k_serverConfigFilePath);
             if (!newConfigFile.is_open())
             {
-                std::string reason = std::string("ServerConfig::load - failed to open ").append(configFilePath.string());
+                std::string reason = std::string("ServerConfig::load - failed to open ").append(k_serverConfigFilePath.string());
                 throw std::runtime_error(reason);
             }
             nlohmann::json jsonNewConfig = {{k_serverConfigChannelsKey, nlohmann::json::array()}};
@@ -44,10 +37,11 @@ void ServerConfig::load()
             newConfigFile.close();
         }
 
-        std::ifstream jsonFile(configFilePath);
+        // Read config into memory
+        std::ifstream jsonFile(k_serverConfigFilePath);
         if (!jsonFile.is_open())
         {
-            std::string reason = std::string("ServerConfig::load - failed to open ").append(configFilePath.string());
+            std::string reason = std::string("ServerConfig::load - failed to open ").append(k_serverConfigFilePath.string());
             throw std::runtime_error(reason);
         }
 
@@ -82,9 +76,7 @@ void ServerConfig::save()
             jsonServerConfig.at(k_serverConfigChannelsKey).push_back(channel);
         }
 
-        std::filesystem::path rootDir = std::filesystem::path(__FILE__).parent_path().parent_path();
-        std::filesystem::path configFilePath = rootDir / k_dataDirName / k_serverConfigFileName;
-        std::filesystem::path tmpFilePath = configFilePath;
+        std::filesystem::path tmpFilePath = k_serverConfigFilePath;
         tmpFilePath.replace_extension(".tmp");
 
         std::ofstream tmpFile(tmpFilePath);
@@ -92,7 +84,7 @@ void ServerConfig::save()
         tmpFile.flush();
         tmpFile.close();
 
-        std::filesystem::rename(tmpFilePath, configFilePath);
+        std::filesystem::rename(tmpFilePath, k_serverConfigFilePath);
     }
     catch(const std::exception& e)
     {

@@ -1,19 +1,38 @@
 #include "Bot.h"
-#include "DosuConfig.h"
-#include "ScrapePlayers.h"
-
-#include <dpp/nlohmann/json.hpp>
+#include "Util.h"
 
 #include <iostream>
-#include <string>
 #include <fstream>
-#include <filesystem>
 #include <cmath>
 #include <sstream>
 #include <iomanip>
 
 namespace Detail
 {
+
+/**
+ * Convert RankRange to associated JSON key.
+ */
+std::string rankRangeToKey(RankRange rankRange)
+{
+    if (rankRange == RankRange::First)
+    {
+        return k_firstRangeKey;
+    }
+    else if (rankRange == RankRange::Second)
+    {
+        return k_secondRangeKey;
+    }
+    else if (rankRange == RankRange::Third)
+    {
+        return k_thirdRangeKey;
+    }
+    else
+    {
+        std::string reason = std::string("Bot::Detail::rankRangeToKey - invalid rank range: ").append(std::to_string(static_cast<int>(rankRange)));
+        throw std::runtime_error(reason);
+    }
+}
 /**
  * Return true if any json user fields are null.
  */
@@ -180,7 +199,9 @@ void Bot::cmdUnsubscribe(const dpp::slashcommand_t& event)
 }
 
 /**
- * Read user data and display it thru a discord embed.
+ * WARNING: This function is not thread-safe!
+ *
+ * Reads user data from disk, building and sending associated embeds to all subscribed channels.
  */
 void Bot::scrapePlayersCallback(int hour)
 {
@@ -194,12 +215,10 @@ void Bot::scrapePlayersCallback(int hour)
     nlohmann::json jsonUsersCompact;
     try
     {
-        std::filesystem::path rootDir = std::filesystem::path(__FILE__).parent_path().parent_path();
-        std::filesystem::path dataFilePath = rootDir / k_dataDirName / k_usersCompactFileName;
-        std::ifstream jsonFile(dataFilePath);
+        std::ifstream jsonFile(k_usersCompactFilePath);
         if (!jsonFile.is_open())
         {
-            std::string reason = std::string("Bot::scrapePlayersCallback - failed to open ").append(dataFilePath.string());
+            std::string reason = std::string("Bot::scrapePlayersCallback - failed to open ").append(k_usersCompactFilePath.string());
             throw std::runtime_error(reason);
         }
         jsonUsersCompact = nlohmann::json::parse(jsonFile);
@@ -325,51 +344,13 @@ dpp::embed Bot::createScrapePlayersEmbed(RankRange rankRange, int hour, nlohmann
  */
 void Bot::addPlayersToDescription(std::stringstream& description, nlohmann::json jsonUsersCompact, RankRange rankRange, bool isTop)
 {
-    // Decide where to pull from
-    nlohmann::json jsonUsers;
-    if (rankRange == RankRange::First)
-    {
-        if (isTop)
-        {
-            jsonUsers = jsonUsersCompact.at(k_firstRangeKey).at(k_topUsersKey);
-        }
-        else
-        {
-            jsonUsers = jsonUsersCompact.at(k_firstRangeKey).at(k_bottomUsersKey);
-        }
-    }
-    else if (rankRange == RankRange::Second)
-    {
-        if (isTop)
-        {
-            jsonUsers = jsonUsersCompact.at(k_secondRangeKey).at(k_topUsersKey);
-        }
-        else
-        {
-            jsonUsers = jsonUsersCompact.at(k_secondRangeKey).at(k_bottomUsersKey);
-        }
-    }
-    else if (rankRange == RankRange::Third)
-    {
-        if (isTop)
-        {
-            jsonUsers = jsonUsersCompact.at(k_thirdRangeKey).at(k_topUsersKey);
-        }
-        else
-        {
-            jsonUsers = jsonUsersCompact.at(k_thirdRangeKey).at(k_bottomUsersKey);
-        }
-    }
-    else
-    {
-        std::string reason = std::string("Bot::addPlayersToDescription - invalid rank range: ").append(std::to_string(static_cast<int>(rankRange)));
-        throw std::runtime_error(reason);
-    }
+    std::string usersKey = (isTop ? k_topUsersKey : k_bottomUsersKey);
+    nlohmann::json jsonUsers = jsonUsersCompact.at(Detail::rankRangeToKey(rankRange)).at(usersKey);
 
     // Add valid players to description
-    size_t displayUsersMax = k_numDisplayUsers / 2;
-    size_t j = 1;
-    for (size_t i = 0; i < displayUsersMax; ++i)
+    std::size_t displayUsersMax = k_numDisplayUsers / 2;
+    std::size_t j = 1;
+    for (std::size_t i = 0; i < displayUsersMax; ++i)
     {
         if (i >= jsonUsers.size())
         {
@@ -425,27 +406,7 @@ void Bot::addPlayersToDescription(std::stringstream& description, nlohmann::json
  */
 ProfilePicture Bot::getScrapePlayersEmbedThumbnail(nlohmann::json jsonUsersCompact, RankRange rankRange)
 {
-    // Decide where to pull from
-    nlohmann::json jsonUsers;
-    if (rankRange == RankRange::First)
-    {
-        jsonUsers = jsonUsersCompact.at(k_firstRangeKey).at(k_topUsersKey);
-    }
-    else if (rankRange == RankRange::Second)
-    {
-        jsonUsers = jsonUsersCompact.at(k_secondRangeKey).at(k_topUsersKey);
-    }
-    else if (rankRange == RankRange::Third)
-    {
-        jsonUsers = jsonUsersCompact.at(k_thirdRangeKey).at(k_topUsersKey);
-    }
-    else
-    {
-        std::string reason = std::string("Bot::getScrapePlayersEmbedThumbnail - invalid rank range: ").append(std::to_string(static_cast<int>(rankRange)));
-        throw std::runtime_error(reason);
-    }
-
-    // Return first valid player
+    nlohmann::json jsonUsers = jsonUsersCompact.at(Detail::rankRangeToKey(rankRange)).at(k_topUsersKey);
     for (const auto& jsonUser : jsonUsers)
     {
         if (Detail::isJsonUserInvalid(jsonUser))
