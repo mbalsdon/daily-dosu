@@ -2,6 +2,7 @@
 #define __BOT_H__
 
 #include "OsuWrapper.h"
+#include "ServerConfig.h"
 
 #include <dpp/dpp.h>
 
@@ -24,6 +25,8 @@ const std::string k_secondRangeButtonID = "second_range_button";
 const std::string k_thirdRangeButtonID = "third_range_button";
 
 const std::string k_cmdPing = "ping";
+const std::string k_cmdSubscribe = "subscribe";
+const std::string k_cmdUnsubscribe = "unsubscribe";
 
 class Bot 
 {
@@ -35,12 +38,16 @@ public:
 
 private:
     void cmdPing(const dpp::slashcommand_t& event);
+    void cmdSubscribe(const dpp::slashcommand_t& event);
+    void cmdUnsubscribe(const dpp::slashcommand_t& event);
 
     dpp::embed createScrapePlayersEmbed(RankRange rankRange, int hour, nlohmann::json jsonUsersCompact);
     void addPlayersToDescription(std::stringstream& description, nlohmann::json jsonUsersCompact, RankRange rankRange, bool isTop);
     ProfilePicture getScrapePlayersEmbedThumbnail(nlohmann::json jsonUsersCompact, RankRange rankRange);
 
     dpp::cluster m_bot;
+    ServerConfig m_serverConfig;
+
     dpp::embed m_firstRangeEmbed;
     dpp::embed m_secondRangeEmbed;
     dpp::embed m_thirdRangeEmbed;

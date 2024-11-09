@@ -46,32 +46,41 @@ int main(int argc, char const *argv[])
     return 0;
 }
 
-// TODO: per-server behaviour; start/stop -> do/dont execute callback (save server id map???)
-// // embed author pfp (3rd field) = server pfp
+// TODO: clean up storage file consts ("data", "x.json", etc)
+// // // commonly used paths (SEE SERVERCONFIG PATH BUILDING) can be saved as obj state
+// // clean up consts in general (including .h just for consts is cringe.. all in one file idk)
+// // rank range enum to key, in bot?
 // // ^^^^^^^^ new commits
 
-// TODO: command that sends raw users.json
+// TODO: server config backup (dailyjob) [concurrency issues...?]
+
 // TODO: settings (country, only rankup/rankdown, ...)
 // // setting options returns sample display
 // // scrapePlayers prebuilds files (CA.json, EE.json, etc)
-// // ^^^^^^^^ new commits
+// // server config needs more complex structure; channel id -> cfg
+// // ^^^^^^^^ new commit
 
 // TODO: help command
-// TODO: bot button caching? i.e. calc and store all embeds for each rank range
 
-// TODO: release
+// TODO: improve logging
+
+// TODO: dosu config setup if doesnt exist (see FUTURE)
+
+// TODO: pls shilling (kofi?)
+
+// TODO: release prep
 // // go thru TODOs (readme, comments, etc)
 // // any cleanups?
-// // rank range enum to key, in bot?
 // // ...
 // // ^^^^^^^^ new commits
+// // run for a few days; get bot into 2 servers (2 diff discord accts)
 
+// TODO: release
 
 // TODO: email peppy ratelimit increase
-// TODO: userids should be saved incase of error; save data every X retrievals and start from there on failure?
-// TODO: sussy detector (< X hrs and > Y increase)
-// TODO: go through FUTUREs/FIXMEs
 
 // TODO: new job: highest play today
 // // https://github.com/Ameobea/osutrack-api
 // // "Get the best plays by pp for all users in a given mode"
+
+// TODO: move to sqlite3 you chud

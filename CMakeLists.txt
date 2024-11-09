@@ -11,6 +11,7 @@ set(SOURCES
     src/DosuConfig.cpp
     src/DailyJob.cpp
     src/ScrapePlayers.cpp
+    src/ServerConfig.cpp
 )
 
 add_executable(${BOT_NAME} ${SOURCES})
