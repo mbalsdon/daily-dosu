@@ -1,5 +1,6 @@
 #include "Bot.h"
 #include "Util.h"
+#include "Logger.h"
 
 #include <iostream>
 #include <fstream>
@@ -99,21 +100,43 @@ std::string toHexString(int i)
 Bot::Bot(const std::string& botToken) 
     : m_bot(botToken)
     , m_serverConfig()
-{}
+{
+    LOG_DEBUG("Constructing Bot instance...");
+}
 
 /**
  * Start the discord bot.
  */
 void Bot::start()
 {
-    std::cout << "Bot::start - starting Discord bot..." << std::endl;
+    LOG_DEBUG("Starting Discord bot...");
 
-    m_bot.on_log(dpp::utility::cout_logger());
+    m_bot.on_log([this](const dpp::log_t& event)
+    {
+        switch (event.severity)
+        {
+        case dpp::ll_debug:
+            LOG_DEBUG(event.message);
+            break;
+        case dpp::ll_info:
+            LOG_INFO(event.message);
+            break;
+        case dpp::ll_warning:
+            LOG_WARN(event.message);
+            break;
+        case dpp::ll_error:
+            LOG_ERROR(event.message);
+            break;
+        case dpp::ll_critical:
+            LOG_ERROR("[CRITICAL] ", event.message);
+            break;
+        }
+    });
 
     m_bot.on_slashcommand([this](const dpp::slashcommand_t& event)
     {
         std::string cmdName = event.command.get_command_name();
-        std::cout << "Bot - received slash command /" << cmdName << "; routing..." << std::endl;
+        LOG_INFO("Received slash command /", cmdName, "; routing...");
 
         if (cmdName == k_cmdPing)
         {
@@ -142,6 +165,8 @@ void Bot::start()
     m_bot.on_button_click([this](const dpp::button_click_t& event)
     {
         auto buttonID = event.custom_id;
+        LOG_DEBUG("Processing button click for button ", buttonID);
+
         if ((buttonID == k_firstRangeButtonID) ||
             (buttonID == k_secondRangeButtonID) ||
             (buttonID == k_thirdRangeButtonID))
@@ -175,10 +200,12 @@ void Bot::start()
  */
 void Bot::scrapePlayersCallback(int hour)
 {
+    LOG_DEBUG("Executing callback for scrape job...");
+
     if ((hour < 0) || (hour > 23))
     {
         hour = hour % 24;
-        std::cout << "Bot::scrapePlayersCallback - hour is out of bounds; normalizing to " << hour << std::endl;
+        LOG_WARN("Hour is out of bounds; normalizing to ", hour, "...");
     }
 
     // Read data from disk to memory
@@ -234,8 +261,6 @@ void Bot::scrapePlayersCallback(int hour)
     message.add_embed(m_firstRangeEmbed);
     message.add_component(actionRow);
 
-    message.channel_id = 1001155170777960618;
-
     // Send message to subscriber list
     for (const auto& channelID : m_serverConfig.getChannelList())
     {
@@ -290,7 +315,7 @@ dpp::embed Bot::createScrapePlayersEmbed(RankRange rankRange, int hour, nlohmann
     if ((hour < 0) || (hour > 23))
     {
         hour = hour % 24;
-        std::cout << "Bot::scrapePlayersCallback - hour is out of bounds; normalizing to " << hour << std::endl;
+        LOG_WARN("Hour is out of bounds; normalizing to ", hour, "...");
     }
 
     if ((rankRange != RankRange::First) &&

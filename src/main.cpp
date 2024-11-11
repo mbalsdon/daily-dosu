@@ -3,6 +3,7 @@
 #include "DailyJob.h"
 #include "ScrapePlayers.h"
 #include "Util.h"
+#include "Logger.h"
 
 #include <dpp/nlohmann/json.hpp>
 
@@ -29,17 +30,18 @@ int main(int argc, char const *argv[])
     if (!std::filesystem::exists(k_dosuConfigFilePath))
     {
         // TODO: Setup tool to create a config
-        std::cout << "Cannot find " << k_dosuConfigFilePath << "! Exiting..." << std::endl;
+        LOG_ERROR("Cannot find ", k_dosuConfigFilePath, "! Exiting...");
         return 1;
     }
 
     DosuConfig::load(k_dosuConfigFilePath);
 
-    // Start bot
+    // Set log level
+    Logger::getInstance().setLogLevel(DosuConfig::logLevel);
+
+    // Start bot and give it some time to start
     Bot bot(DosuConfig::discordBotToken);
     std::thread botThread(&Bot::start, &bot);
-
-    // Give bot some time to start
     std::this_thread::sleep_for(std::chrono::seconds(7));
 
     // Start jobs
@@ -51,28 +53,13 @@ int main(int argc, char const *argv[])
     DailyJob backupServerConfigJob(backupHour, "backupServerConfig", [&bot]() { bot.backupServerConfig(); }, nullptr);
     std::thread backupServerConfigThread(&DailyJob::start, &backupServerConfigJob);
 
+    // Wait on threads
     botThread.join();
     scrapePlayersThread.join();
     backupServerConfigThread.join();
 
     return 0;
 }
-
-// TODO: settings
-// // 1 list (20) or 2 lists (10+10)
-// // choose list(s); global/country, top or bottom
-// // setting options returns sample display
-// // scrapePlayers prebuilds files (CA.json, EE.json, etc)
-// // server config needs more complex structure; channel id -> cfg
-// // need to move off of precomputed embeds
-// // move stuff from bot to embed builder class? does it need state?
-// // ^^^^^^^^ new commit
-
-// TODO: improve logging
-// // logger class; timestamps + log level (dosuconfig)
-// // no need for disk saves
-// // better way to throw runtime errors?
-// // add more log output to fns, remove some
 
 // TODO: DosuConfig setup
 // // just construct in main
@@ -85,10 +72,9 @@ int main(int argc, char const *argv[])
 // // // how to impl? burst is fine but wanna prevent constant spam
 // // 2 other general security features to have?
 // // 3 manual run cmd (allowed user id in dosu_config)
-// // 4 only write full users to disk if dosu_config flag is set (only rly need for debug)
-// // 5 help command
-// // 6 pls shilling (kofi?)
-// // 7 go through TODO/FUTURE/FIXME, any other necessary cleanups
+// // 4 help command
+// // 5 pls shilling (kofi?)
+// // 6 go through TODO/FUTURE/FIXME, any other necessary cleanups
 
 // TODO: release prep
 // // test e2e alt acct
