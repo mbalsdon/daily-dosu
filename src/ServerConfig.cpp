@@ -5,6 +5,25 @@
 
 #include <fstream>
 #include <filesystem>
+#include <iostream>
+#include <ctime>
+#include <iomanip>
+#include <sstream>
+#include <chrono>
+#include <regex>
+
+namespace Detail
+{
+std::string getCurrentTimeString()
+{
+    std::time_t now = std::time(nullptr);
+    std::tm* localTime = std::localtime(&now);
+    std::ostringstream oss;
+    oss << std::put_time(localTime, k_serverConfigBackupTimeFormat);
+
+    return oss.str();
+}
+} /* namespace Detail */
 
 /**
  * ServerConfig constructor.
@@ -89,6 +108,45 @@ void ServerConfig::save()
     catch(const std::exception& e)
     {
         std::string reason = std::string("ServerConfig::save - ").append(e.what());
+        throw std::runtime_error(reason);
+    }
+}
+
+/**
+ * Copy server config to timestamped backup on disk.
+ * Remove backups that are sufficiently old.
+ */
+void ServerConfig::backup()
+{
+    std::lock_guard<std::mutex> lock(m_serverConfigMtx);
+
+    try
+    {
+        // Create timestamped backup
+        std::string backupFileName = Detail::getCurrentTimeString() + k_serverConfigBackupSuffix;
+        std::filesystem::path backupFilePath = k_dataDir / backupFileName;
+        std::filesystem::copy(k_serverConfigFilePath, backupFilePath, std::filesystem::copy_options::overwrite_existing);
+
+        // Remove old backups
+        for (const auto& file : std::filesystem::directory_iterator(k_dataDir))
+        {
+            std::regex pattern(k_serverConfigTimeRegex + k_serverConfigBackupSuffix);
+            if (std::regex_match(file.path().filename().string(), pattern))
+            {
+                auto lastWriteTime = std::filesystem::last_write_time(file.path());
+                auto now = std::filesystem::file_time_type::clock::now();
+                std::chrono::hours age = std::chrono::duration_cast<std::chrono::hours>(now - lastWriteTime);
+                if (age > k_serverConfigBackupExpiry)
+                {
+                    std::filesystem::remove(file.path());
+                    std::cout << "ServerConfig::backup - removed expired backup " << file.path() << std::endl;
+                }
+            }
+        }
+    }
+    catch(const std::exception& e)
+    {
+        std::string reason = std::string("ServerConfig::backup - ").append(e.what());
         throw std::runtime_error(reason);
     }
 }

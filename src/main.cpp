@@ -43,20 +43,20 @@ int main(int argc, char const *argv[])
     std::this_thread::sleep_for(std::chrono::seconds(7));
 
     // Start jobs
-    int hour = 0;
-    DailyJob job(hour, "scrapePlayers", scrapePlayers, [&bot, hour]() { bot.scrapePlayersCallback(hour); });
-    std::thread jobThread(&DailyJob::start, &job);
+    int scrapeHour = 0;
+    DailyJob scrapePlayersJob(scrapeHour, "scrapePlayers", scrapePlayers, [&bot, scrapeHour]() { bot.scrapePlayersCallback(scrapeHour); });
+    std::thread scrapePlayersThread(&DailyJob::start, &scrapePlayersJob);
+
+    int backupHour = 23;
+    DailyJob backupServerConfigJob(backupHour, "backupServerConfig", [&bot]() { bot.backupServerConfig(); }, nullptr);
+    std::thread backupServerConfigThread(&DailyJob::start, &backupServerConfigJob);
 
     botThread.join();
-    jobThread.join();
+    scrapePlayersThread.join();
+    backupServerConfigThread.join();
 
     return 0;
 }
-
-// TODO: server config backup
-// // add backup cmd to ServerConfig (pls having thread safety)
-// // // overwrite backup if write time was more than 7d ago
-// // register as dailyjob
 
 // TODO: settings
 // // 1 list (20) or 2 lists (10+10)
@@ -72,11 +72,13 @@ int main(int argc, char const *argv[])
 // // logger class; timestamps + log level (dosuconfig)
 // // no need for disk saves
 // // better way to throw runtime errors?
+// // add more log output to fns, remove some
 
 // TODO: DosuConfig setup
 // // just construct in main
 // // constructor checks file is valid; if not, prompt for cmd setup tool (run if Y exit if N)
 // // constructor loads file
+// // also move runHour vals (main) to dosuconfig
 
 // TODO: touchups
 // // 1 prevent bot spam (X commands per user per time, Y commands per channel per time)
