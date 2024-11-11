@@ -1,4 +1,5 @@
 #include "OsuWrapper.h"
+#include "Logger.h"
 
 #include <dpp/nlohmann/json.hpp>
 
@@ -12,6 +13,8 @@
  */
 OsuWrapper::OsuWrapper(const std::string& clientID, const std::string& clientSecret, const int apiCooldownMs)
 {
+    LOG_DEBUG("Constructing OsuWrapper instance...");
+
     m_clientID = clientID;
     m_clientSecret = clientSecret;
     m_apiCooldownMs = apiCooldownMs;
@@ -36,7 +39,7 @@ OsuWrapper::~OsuWrapper()
  */
 void OsuWrapper::updateToken()
 {
-    std::cout << "OsuWrapper::updateToken - requesting OAuth token from osu!API..." << std::endl;
+    LOG_DEBUG("Requesting OAuth token from osu!API...");
 
     CURL * tokenCurlHandle = curl_easy_init();
     if (!tokenCurlHandle)
@@ -115,7 +118,7 @@ bool OsuWrapper::getRankingIDs(Page page, std::vector<UserID>& userIDs, std::siz
 {
     page += 1;
 
-    std::cout << "OsuWrapper::getRankingIDs - requesting page " << static_cast<int>(page) << " ranking data from osu!API..." << std::endl;
+    LOG_DEBUG("Requesting page ", static_cast<int>(page), " ranking data from osu!API...");
 
     if (page > k_getRankingIDMaxPage)
     {
@@ -191,7 +194,7 @@ bool OsuWrapper::getRankingIDs(Page page, std::vector<UserID>& userIDs, std::siz
  */
 bool OsuWrapper::getUser(UserID userID, DosuUser& user) 
 {
-    std::cout << "OsuWrapper::getUser - requesting data from osu!API for user with ID " << userID << "..." << std::endl;
+    LOG_DEBUG("Requesting data from osu!API for user with ID ", userID, "...");
     
     if (!m_curlHandle)
     {
@@ -292,7 +295,7 @@ bool OsuWrapper::makeRequest()
                 waitMs = 0;
             }
 
-            std::cout << "OsuWrapper::makeRequest - request failed; got CURLcode " << std::to_string(response) << ". Retrying in " << waitMs + delayMs << "ms..." << std::endl;
+            LOG_WARN("Request failed; got CURLcode ", std::to_string(response), ". Retrying in ", waitMs + delayMs, "ms...");
             std::this_thread::sleep_for(std::chrono::milliseconds(waitMs));
             continue;
         }
@@ -323,12 +326,12 @@ bool OsuWrapper::makeRequest()
                 delayMs = (std::pow(2, retries) + offset) * 1000;
             }
 
-            std::cout << "OsuWrapper::makeRequest - request failed; retrying in " << std::to_string(delayMs) << "ms..." << std::endl;
+            LOG_WARN("Request failed; retrying in ", std::to_string(delayMs), "ms...");
             ++retries;
         }
         else
         {
-            std::cout << "OsuWrapper::makeRequest - received unhandled HTTP code " << std::to_string(httpCode) << std::endl;
+            LOG_ERROR("Made request and received unhandled HTTP code ", std::to_string(httpCode), "!");
             return false;
         }
     }

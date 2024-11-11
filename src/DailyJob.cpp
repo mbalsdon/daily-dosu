@@ -1,4 +1,5 @@
 #include "DailyJob.h"
+#include "Logger.h"
 
 #include <iostream>
 #include <chrono>
@@ -34,6 +35,8 @@ DailyJob::DailyJob(int hour, std::string name, std::function<void()> job, std::f
     : m_name(name)
     , m_jobCallback(jobCallback)
 {
+    LOG_DEBUG("Creating DailyJob instance for ", name, ", running at hour ", hour);
+
     if (!job)
     {
         std::string reason = "DailyJob::DailyJob - job cannot be nullptr!";
@@ -43,7 +46,7 @@ DailyJob::DailyJob(int hour, std::string name, std::function<void()> job, std::f
     if ((hour < 0) || (hour > 23))
     {
         hour = hour % 24;
-        std::cout << "DailyJob::DailyJob - hour is out of bounds; normalizing to " << hour << std::endl;
+        LOG_WARN("Hour is out of bounds; normalizing to ", hour, "...");
     }
 
     m_hour = hour;
@@ -57,7 +60,7 @@ DailyJob::DailyJob(int hour, std::string name, std::function<void()> job, std::f
  */
 void DailyJob::start()
 {
-    std::cout << "DailyJob::start - running job \"" << m_name << "\" at every " << m_hour << "th hour..." << std::endl;
+    LOG_INFO("Running job \"", m_name, "\" at every ", m_hour, "th hour...");
     std::thread(
         [this]()
         {
@@ -66,21 +69,21 @@ void DailyJob::start()
                 // Sleep until next scheduled run
                 std::chrono::minutes minutesUntilNextRun = Detail::minutesUntil(m_hour);
                 double hoursUntilNextRun = std::chrono::duration<double, std::ratio<60>>(minutesUntilNextRun).count() / 60.;
-                std::cout << "DailyJob::" << m_name << " - sleeping for " << hoursUntilNextRun << " hours before running again..." << std::endl;
+                LOG_DEBUG(m_name, " sleeping for ", hoursUntilNextRun, " hours before running again...");
                 std::this_thread::sleep_for(minutesUntilNextRun);
 
                 // Run job, reporting time taken (not high precision)
-                std::cout << "DailyJob::" << m_name << " - beginning execution..." << std::endl;
+                LOG_INFO(m_name, " beginning execution...");
                 auto startTime = std::chrono::system_clock::now();
                 m_job();
                 auto endTime = std::chrono::system_clock::now();
                 auto duration = std::chrono::duration_cast<std::chrono::minutes>(endTime - startTime);
-                std::cout << "DailyJob::" << m_name << " - job finished execution! Time elapsed: " << duration.count() << " minutes" << std::endl;
+                LOG_INFO(m_name, " finished execution! Time elapsed: ", duration.count(), " minutes.");
 
                 // Execute callback if it exists
                 if (m_jobCallback)
                 {
-                    std::cout << "DailyJob::" << m_name << " - executing job callback..." << std::endl;
+                    LOG_DEBUG("Executing callback for ", m_name, "...");
                     m_jobCallback();
                 }
             }

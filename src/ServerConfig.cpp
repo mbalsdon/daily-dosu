@@ -1,5 +1,6 @@
 #include "ServerConfig.h"
 #include "Util.h"
+#include "Logger.h"
 
 #include <dpp/nlohmann/json.hpp>
 
@@ -30,6 +31,7 @@ std::string getCurrentTimeString()
  */
 ServerConfig::ServerConfig()
 {
+    LOG_DEBUG("Constructing ServerConfig instance...");
     load();
 }
 
@@ -38,6 +40,8 @@ ServerConfig::ServerConfig()
  */
 void ServerConfig::load()
 {
+    LOG_DEBUG("Loading server config into memory...");
+
     std::lock_guard<std::mutex> lock(m_serverConfigMtx);
 
     try
@@ -84,6 +88,8 @@ void ServerConfig::load()
  */
 void ServerConfig::save()
 {
+    LOG_DEBUG("Saving server config to disk...");
+
     std::lock_guard<std::mutex> lock(m_serverConfigMtx);
 
     try
@@ -118,6 +124,8 @@ void ServerConfig::save()
  */
 void ServerConfig::backup()
 {
+    LOG_DEBUG("Backing up server config and removing old ones...");
+
     std::lock_guard<std::mutex> lock(m_serverConfigMtx);
 
     try
@@ -126,6 +134,7 @@ void ServerConfig::backup()
         std::string backupFileName = Detail::getCurrentTimeString() + k_serverConfigBackupSuffix;
         std::filesystem::path backupFilePath = k_dataDir / backupFileName;
         std::filesystem::copy(k_serverConfigFilePath, backupFilePath, std::filesystem::copy_options::overwrite_existing);
+        LOG_INFO("Successfully created server config backup at ", backupFilePath.string());
 
         // Remove old backups
         for (const auto& file : std::filesystem::directory_iterator(k_dataDir))
@@ -139,7 +148,7 @@ void ServerConfig::backup()
                 if (age > k_serverConfigBackupExpiry)
                 {
                     std::filesystem::remove(file.path());
-                    std::cout << "ServerConfig::backup - removed expired backup " << file.path() << std::endl;
+                    LOG_INFO("Removed expired server config backup at ", file.path());
                 }
             }
         }
@@ -156,6 +165,7 @@ void ServerConfig::backup()
  */
 void ServerConfig::addChannel(dpp::snowflake channelID)
 {
+    LOG_DEBUG("Attempting to add channel ", channelID, " to server config...");
     {
         std::lock_guard<std::mutex> lock(m_serverConfigMtx);
         if (m_channelList.find(channelID) != m_channelList.end())
@@ -172,6 +182,7 @@ void ServerConfig::addChannel(dpp::snowflake channelID)
  */
 void ServerConfig::removeChannel(dpp::snowflake channelID)
 {
+    LOG_DEBUG("Attempting to remove channel ", channelID, " to server config...");
     {
         std::lock_guard<std::mutex> lock(m_serverConfigMtx);
         if (m_channelList.find(channelID) == m_channelList.end())

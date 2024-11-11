@@ -4,6 +4,7 @@
 
 #include <fstream>
 
+int DosuConfig::logLevel;
 std::string DosuConfig::discordBotToken;
 std::string DosuConfig::osuClientID;
 std::string DosuConfig::osuClientSecret;
@@ -20,6 +21,7 @@ void DosuConfig::load(const std::filesystem::path& filePath)
     inputFile >> configDataJson;
     inputFile.close();
 
+    DosuConfig::logLevel = configDataJson["LOG_LEVEL"];
     DosuConfig::discordBotToken = configDataJson["DISCORD_BOT_TOKEN"];
     DosuConfig::osuClientID = configDataJson["OSU_CLIENT_ID"];
     DosuConfig::osuClientSecret = configDataJson["OSU_CLIENT_SECRET"];

@@ -1,6 +1,7 @@
 #include "ScrapePlayers.h"
 #include "OsuWrapper.h"
 #include "DosuConfig.h"
+#include "Logger.h"
 
 #include <dpp/nlohmann/json.hpp>
 
@@ -58,12 +59,20 @@ void scrapePlayers()
 
     // Grab user data and calculate associated rank change ratio
     nlohmann::json jsonUsers = nlohmann::json::array();
+    size_t count = 0;
     for (const UserID& userID : userIDs)
     {
+        // Log once in a while so we know we're not dead
+        if (count % k_getRankingIDMaxNumIDs == 0)
+        {
+            LOG_INFO("Progress: ", count, "/", numIDs);
+        }
+        ++count;
+
         DosuUser user;
         if (!osu.getUser(userID, user))
         {
-            std::cout << "scrapePlayers - failed to get user " << static_cast<int>(userID) << "! Skipping..." << std::endl;
+            LOG_WARN("Failed to get user ", static_cast<int>(userID), "; skipping...");
             continue;
         }
 
@@ -98,7 +107,7 @@ void scrapePlayers()
 
     usersFullJsonFile << jsonUsers.dump(2) << std::endl;
     usersFullJsonFile.close();
-    std::cout << "scrapePlayers - finished writing user data to " << k_usersFullFilePath.string() << "!" << std::endl;
+    LOG_DEBUG("Finished writing user data to ", k_usersFullFilePath.string(), "!");
 
     // Get top users from each rank range
     nlohmann::json topUsersFirstRangeJson = nlohmann::json::array();
@@ -181,5 +190,5 @@ void scrapePlayers()
 
     usersCompactJsonFile << compactUsersJson.dump(2) << std::endl;
     usersCompactJsonFile.close();
-    std::cout << "scrapePlayers - finished writing user data to " << k_usersCompactFilePath.string() << "!" << std::endl;
+    LOG_DEBUG("Finished writing user data to ", k_usersCompactFilePath.string(), "!");
 }

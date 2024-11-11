@@ -9,6 +9,7 @@ class DosuConfig
 public:
     static void load(const std::filesystem::path& filePath);
 
+    static int logLevel;
     static std::string discordBotToken;
     static std::string osuClientID;
     static std::string osuClientSecret;
