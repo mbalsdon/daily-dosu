@@ -7,14 +7,14 @@
 class DailyJob
 {
 public:
-    DailyJob(int hour, std::string name, void (*job)(), std::function<void()> jobCallback);
+    DailyJob(int hour, std::string name, std::function<void()> job, std::function<void()> jobCallback);
 
     void start();
 
 private:
     int m_hour;
     std::string m_name;
-    void (*m_job)();
+    std::function<void()> m_job;
     std::function<void()> m_jobCallback;
 };
 

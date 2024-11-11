@@ -30,7 +30,9 @@ std::chrono::minutes minutesUntil(int hour)
 /**
  * DailyJob constructor.
  */
-DailyJob::DailyJob(int hour, std::string name, void (*job)(), std::function<void()> jobCallback)
+DailyJob::DailyJob(int hour, std::string name, std::function<void()> job, std::function<void()> jobCallback)
+    : m_name(name)
+    , m_jobCallback(jobCallback)
 {
     if (!job)
     {
@@ -45,9 +47,7 @@ DailyJob::DailyJob(int hour, std::string name, void (*job)(), std::function<void
     }
 
     m_hour = hour;
-    m_name = name;
     m_job = job;
-    m_jobCallback = jobCallback;
 }
 
 /**

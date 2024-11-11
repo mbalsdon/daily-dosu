@@ -13,6 +13,7 @@ public:
 
     void load();
     void save();
+    void backup();
     void addChannel(dpp::snowflake channelID);
     void removeChannel(dpp::snowflake channelID);
     const std::unordered_set<dpp::snowflake> getChannelList();

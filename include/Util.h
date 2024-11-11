@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <cstddef>
 #include <filesystem>
+#include <chrono>
 
 /* - - - - - - - - Types - - - - - - - */
 
@@ -76,5 +77,10 @@ const std::filesystem::path k_dataDir = k_rootDir / "data";
 const std::filesystem::path k_usersFullFilePath = k_dataDir / "users_full.json";
 const std::filesystem::path k_usersCompactFilePath = k_dataDir / "users_compact.json";
 const std::filesystem::path k_serverConfigFilePath = k_dataDir / "server_config.json";
+
+const std::string k_serverConfigBackupSuffix = "__server_config_backup.json";
+constexpr const char* k_serverConfigBackupTimeFormat = "%Y-%m-%d_%H:%M:%S";
+const std::string k_serverConfigTimeRegex = "\\d{4}-\\d{2}-\\d{2}_\\d{2}:\\d{2}:\\d{2}";
+const std::chrono::hours k_serverConfigBackupExpiry = std::chrono::hours(24 * 14);
 
 #endif /* __UTIL_H__ */

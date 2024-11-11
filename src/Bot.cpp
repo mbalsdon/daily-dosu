@@ -169,36 +169,6 @@ void Bot::start()
 }
 
 /**
- * Run the ping command.
- */
-void Bot::cmdPing(const dpp::slashcommand_t& event)
-{
-    event.reply("Pong!");
-}
-
-/**
- * Run the subscribe command.
- * Adds this channel to the list of channels to send daily messages to.
- */
-void Bot::cmdSubscribe(const dpp::slashcommand_t& event)
-{
-    dpp::snowflake channelID = event.command.channel_id;
-    m_serverConfig.addChannel(channelID);
-    event.reply("Daily messages have been enabled for this channel.");
-}
-
-/**
- * Run the unsubscribe command.
- * Removes this channel to the list of channels to send daily messages to.
- */
-void Bot::cmdUnsubscribe(const dpp::slashcommand_t& event)
-{
-    dpp::snowflake channelID = event.command.channel_id;
-    m_serverConfig.removeChannel(channelID);
-    event.reply("Daily messages have been disabled for this channel.");
-}
-
-/**
  * WARNING: This function is not thread-safe!
  *
  * Reads user data from disk, building and sending associated embeds to all subscribed channels.
@@ -272,6 +242,44 @@ void Bot::scrapePlayersCallback(int hour)
         message.channel_id = channelID;
         m_bot.message_create(message);
     }
+}
+
+/**
+ * Backup server config.
+ */
+void Bot::backupServerConfig()
+{
+    m_serverConfig.backup();
+}
+
+/**
+ * Run the ping command.
+ */
+void Bot::cmdPing(const dpp::slashcommand_t& event)
+{
+    event.reply("Pong!");
+}
+
+/**
+ * Run the subscribe command.
+ * Adds this channel to the list of channels to send daily messages to.
+ */
+void Bot::cmdSubscribe(const dpp::slashcommand_t& event)
+{
+    dpp::snowflake channelID = event.command.channel_id;
+    m_serverConfig.addChannel(channelID);
+    event.reply("Daily messages have been enabled for this channel.");
+}
+
+/**
+ * Run the unsubscribe command.
+ * Removes this channel to the list of channels to send daily messages to.
+ */
+void Bot::cmdUnsubscribe(const dpp::slashcommand_t& event)
+{
+    dpp::snowflake channelID = event.command.channel_id;
+    m_serverConfig.removeChannel(channelID);
+    event.reply("Daily messages have been disabled for this channel.");
 }
 
 /**

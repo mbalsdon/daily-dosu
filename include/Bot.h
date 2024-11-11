@@ -39,6 +39,7 @@ public:
 
     void start();
     void scrapePlayersCallback(int runHour);
+    void backupServerConfig();
 
 private:
     void cmdPing(const dpp::slashcommand_t& event);
