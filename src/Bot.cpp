@@ -1,12 +1,14 @@
 #include "Bot.h"
 #include "Util.h"
 #include "Logger.h"
+#include "DosuConfig.h"
 
 #include <iostream>
 #include <fstream>
 #include <cmath>
 #include <sstream>
 #include <iomanip>
+#include <filesystem>
 
 namespace Detail
 {
@@ -31,7 +33,7 @@ std::string rankRangeToKey(RankRange rankRange)
     else
     {
         std::string reason = std::string("Bot::Detail::rankRangeToKey - invalid rank range: ").append(std::to_string(static_cast<int>(rankRange)));
-        throw std::runtime_error(reason);
+        throw std::invalid_argument(reason);
     }
 }
 /**
@@ -102,6 +104,16 @@ Bot::Bot(const std::string& botToken)
     , m_serverConfig()
 {
     LOG_DEBUG("Constructing Bot instance...");
+
+    // Read data from disk to memory, if it exists
+    if (!std::filesystem::exists(k_usersCompactFilePath))
+    {
+        m_embedsPopulated = false;
+        return;
+    }
+
+    loadEmbeds();
+    m_embedsPopulated = true;
 }
 
 /**
@@ -136,11 +148,35 @@ void Bot::start()
     m_bot.on_slashcommand([this](const dpp::slashcommand_t& event)
     {
         std::string cmdName = event.command.get_command_name();
-        LOG_INFO("Received slash command /", cmdName, "; routing...");
 
-        if (cmdName == k_cmdPing)
+        // Verify user is under ratelimit
+        auto now = std::chrono::steady_clock::now();
+        auto userID = event.command.usr.id;
+        if (m_latestCommands.count(userID))
+        {
+            auto lastUsed = m_latestCommands[userID];
+            if (now - lastUsed < k_cmdRateLimitPeriod)
+            {
+                LOG_DEBUG("Command from user ", userID, " was blocked due to ratelimit");
+                event.reply("You are using commands too quickly! Please wait a few seconds...");
+                return;
+            }
+        }
+        m_latestCommands[userID] = now;
+
+        // Route command
+        LOG_INFO("Received slash command /", cmdName, "; routing...");
+        if (cmdName == k_cmdHelp)
+        {
+            cmdHelp(event);
+        }
+        else if (cmdName == k_cmdPing)
         {
             cmdPing(event);
+        }
+        else if (cmdName == k_cmdNewsletter)
+        {
+            cmdNewsletter(event);
         }
         else if (cmdName == k_cmdSubscribe)
         {
@@ -156,9 +192,11 @@ void Bot::start()
     {
         if (dpp::run_once<struct register_bot_commands>())
         {
-            m_bot.global_command_create(dpp::slashcommand(k_cmdPing, "Ping pong!", m_bot.me.id));
-            m_bot.global_command_create(dpp::slashcommand(k_cmdSubscribe, "Begin sending daily messages to this channel.", m_bot.me.id));
-            m_bot.global_command_create(dpp::slashcommand(k_cmdUnsubscribe, "Stop sending daily messages to this channel.", m_bot.me.id));
+            m_bot.global_command_create(dpp::slashcommand(k_cmdHelp, k_cmdHelpDesc, m_bot.me.id));
+            m_bot.global_command_create(dpp::slashcommand(k_cmdPing, k_cmdPingDesc, m_bot.me.id));
+            m_bot.global_command_create(dpp::slashcommand(k_cmdNewsletter, k_cmdNewsletterDesc, m_bot.me.id));
+            m_bot.global_command_create(dpp::slashcommand(k_cmdSubscribe, k_cmdSubscribeDesc, m_bot.me.id));
+            m_bot.global_command_create(dpp::slashcommand(k_cmdUnsubscribe, k_cmdUnsubscribeDesc, m_bot.me.id));
         }
     });
 
@@ -166,6 +204,20 @@ void Bot::start()
     {
         auto buttonID = event.custom_id;
         LOG_DEBUG("Processing button click for button ", buttonID);
+
+        auto now = std::chrono::steady_clock::now();
+        auto userID = event.command.usr.id;
+        if (m_latestCommands.count(userID))
+        {
+            auto lastUsed = m_latestCommands[userID];
+            if (now - lastUsed < k_buttonRateLimitPeriod)
+            {
+                LOG_DEBUG("Buttonpress from user ", userID, " was blocked due to ratelimit");
+                event.reply();
+                return;
+            }
+        }
+        m_latestCommands[userID] = now;
 
         if ((buttonID == k_firstRangeButtonID) ||
             (buttonID == k_secondRangeButtonID) ||
@@ -198,63 +250,13 @@ void Bot::start()
  *
  * Reads user data from disk, building and sending associated embeds to all subscribed channels.
  */
-void Bot::scrapePlayersCallback(int hour)
+void Bot::scrapePlayersCallback()
 {
     LOG_DEBUG("Executing callback for scrape job...");
 
-    if ((hour < 0) || (hour > 23))
-    {
-        hour = hour % 24;
-        LOG_WARN("Hour is out of bounds; normalizing to ", hour, "...");
-    }
+    loadEmbeds();
 
-    // Read data from disk to memory
-    nlohmann::json jsonUsersCompact;
-    try
-    {
-        std::ifstream jsonFile(k_usersCompactFilePath);
-        if (!jsonFile.is_open())
-        {
-            std::string reason = std::string("Bot::scrapePlayersCallback - failed to open ").append(k_usersCompactFilePath.string());
-            throw std::runtime_error(reason);
-        }
-        jsonUsersCompact = nlohmann::json::parse(jsonFile);
-        jsonFile.close();
-    }
-    catch (const std::exception& e)
-    {
-        throw std::runtime_error(e.what());
-    }
-
-    // Build embeds
-    m_firstRangeEmbed = createScrapePlayersEmbed(RankRange::First, hour, jsonUsersCompact);
-    m_secondRangeEmbed = createScrapePlayersEmbed(RankRange::Second, hour, jsonUsersCompact);
-    m_thirdRangeEmbed = createScrapePlayersEmbed(RankRange::Third, hour, jsonUsersCompact);
-
-    // Build buttons
-    dpp::component firstRangeButton;
-    firstRangeButton.set_type(dpp::cot_button);
-    firstRangeButton.set_label("#1 - #" + std::to_string(k_firstRangeMax));
-    firstRangeButton.set_style(dpp::cos_primary);
-    firstRangeButton.set_id(k_firstRangeButtonID);
-
-    dpp::component secondRangeButton;
-    secondRangeButton.set_type(dpp::cot_button);
-    secondRangeButton.set_label("#" + std::to_string(k_firstRangeMax + 1) + " - #" + std::to_string(k_secondRangeMax));
-    secondRangeButton.set_style(dpp::cos_primary);
-    secondRangeButton.set_id(k_secondRangeButtonID);
-
-    dpp::component thirdRangeButton;
-    thirdRangeButton.set_type(dpp::cot_button);
-    thirdRangeButton.set_label("#" + std::to_string(k_secondRangeMax + 1) + " - #" + std::to_string(k_thirdRangeMax));
-    thirdRangeButton.set_style(dpp::cos_primary);
-    thirdRangeButton.set_id(k_thirdRangeButtonID);
-
-    dpp::component actionRow;
-    actionRow.set_type(dpp::cot_action_row);
-    actionRow.add_component(firstRangeButton);
-    actionRow.add_component(secondRangeButton);
-    actionRow.add_component(thirdRangeButton);
+    dpp::component actionRow = createScrapePlayersActionRow();
 
     // Build message
     dpp::message message;
@@ -265,7 +267,13 @@ void Bot::scrapePlayersCallback(int hour)
     for (const auto& channelID : m_serverConfig.getChannelList())
     {
         message.channel_id = channelID;
-        m_bot.message_create(message);
+        m_bot.message_create(message, [channelID](const dpp::confirmation_callback_t& callback)
+        {
+            if (callback.is_error())
+            {
+                LOG_WARN("Failed to send message to channel ", channelID, "; ", callback.get_error().message);
+            }
+        });
     }
 }
 
@@ -278,11 +286,55 @@ void Bot::backupServerConfig()
 }
 
 /**
+ * Run the help command.
+ */
+void Bot::cmdHelp(const dpp::slashcommand_t& event)
+{
+    dpp::embed embed = dpp::embed()
+        .set_timestamp(time(0))
+        .set_color(k_helpColor)
+        .set_footer(
+            dpp::embed_footer()
+            .set_text("https://github.com/mbalsdon/daily-dosu")
+        );
+
+    std::stringstream description;
+    description << "`help` - " << k_cmdHelpDesc << "\n";
+    description << "`ping` - " << k_cmdPingDesc << "\n";
+    description << "`newsletter` - " << k_cmdNewsletterDesc << "\n";
+    description << "`subscribe` - " << k_cmdSubscribeDesc << "\n";
+    description << "`unsubscribe` - " << k_cmdUnsubscribeDesc << "\n";
+    embed.set_description(description.str());
+
+    dpp::message message;
+    message.add_embed(embed);
+    event.reply(message);
+}
+
+/**
  * Run the ping command.
  */
 void Bot::cmdPing(const dpp::slashcommand_t& event)
 {
     event.reply("Pong!");
+}
+
+/**
+ * Run the newsletter command.
+ */
+void Bot::cmdNewsletter(const dpp::slashcommand_t& event)
+{
+    if (!m_embedsPopulated)
+    {
+        event.reply("Couldn't find newsletter! If you still see this message tomorrow, it might be a bug.");
+        return;
+    }
+
+    dpp::message message;
+    dpp::component actionRow = createScrapePlayersActionRow();
+    message.add_embed(m_firstRangeEmbed);
+    message.add_component(actionRow);
+    event.reply(message);
 }
 
 /**
@@ -308,29 +360,56 @@ void Bot::cmdUnsubscribe(const dpp::slashcommand_t& event)
 }
 
 /**
- * Create scrapePlayers discord embed.
+ * Load user data from disk and pre-build embeds.
+ * The embeds are the same for everybody so this avoids some redundant computation.
  */
-dpp::embed Bot::createScrapePlayersEmbed(RankRange rankRange, int hour, nlohmann::json jsonUsersCompact)
+void Bot::loadEmbeds()
 {
-    if ((hour < 0) || (hour > 23))
+    LOG_DEBUG("Loading embeds into memory...");
+
+    nlohmann::json jsonUsersCompact;
+    try
     {
-        hour = hour % 24;
-        LOG_WARN("Hour is out of bounds; normalizing to ", hour, "...");
+        std::ifstream jsonFile(k_usersCompactFilePath);
+        if (!jsonFile.is_open())
+        {
+            std::string reason = std::string("Bot::loadEmbeds - failed to open ").append(k_usersCompactFilePath.string());
+            throw std::runtime_error(reason);
+        }
+        jsonUsersCompact = nlohmann::json::parse(jsonFile);
+        jsonFile.close();
+    }
+    catch(const std::exception& e)
+    {
+        throw std::runtime_error(e.what());
     }
 
+    m_firstRangeEmbed = createScrapePlayersEmbed(RankRange::First, jsonUsersCompact);
+    m_secondRangeEmbed = createScrapePlayersEmbed(RankRange::Second, jsonUsersCompact);
+    m_thirdRangeEmbed = createScrapePlayersEmbed(RankRange::Third, jsonUsersCompact);
+
+    m_embedsPopulated = true;
+}
+
+/**
+ * Create scrapePlayers discord embed.
+ */
+dpp::embed Bot::createScrapePlayersEmbed(RankRange rankRange, nlohmann::json jsonUsersCompact)
+{
     if ((rankRange != RankRange::First) &&
         (rankRange != RankRange::Second) &&
         (rankRange != RankRange::Third))
     {
         std::string reason = std::string("Bot::createScrapePlayersEmbed - invalid rank range: ").append(std::to_string(static_cast<int>(rankRange)));
-        throw std::runtime_error(reason);
+        throw std::invalid_argument(reason);
     }
 
     // Add static embed fields
+    int hour = DosuConfig::scrapePlayersRunHour;
     std::string footerText = "Runs every day at " + Detail::toHourString(hour) + "PST";
     std::string footerIcon = k_twemojiClockPrefix + Detail::toHexString(Detail::convertTo12Hour(hour) - 1) + k_twemojiClockSuffix;
     dpp::embed embed = dpp::embed()
-        .set_author("Here's your daily dose of osu!", "https://github.com/mbalsdon/daily-dosu", "") // zesty ahh bot
+        .set_author("Here's your daily dose of osu!", "https://github.com/mbalsdon/daily-dosu", "https://spreadnuts.s-ul.eu/HDlrjbqe.png") // zesty ahh bot
         .set_timestamp(time(0))
         .set_footer(
             dpp::embed_footer()
@@ -406,7 +485,7 @@ void Bot::addPlayersToDescription(std::stringstream& description, nlohmann::json
 
         if (j > 1)
         {
-            description << "▫▫▫▫▫▫▫▫▫▫▫▫▫▫▫▫▫▫▫▫▫▫▫▫▫▫▫▫▫▫▫▫▫▫▫▫▫▫▫▫▫▫▫▫▫▫▫▫▫▫▫▫▫▫▫▫▫▫▫▫▫▫▫\n";
+            description << "\n";
         }
 
         UserID userID = jsonUser.at(k_userIDKey).get<UserID>();
@@ -422,13 +501,9 @@ void Bot::addPlayersToDescription(std::stringstream& description, nlohmann::json
         std::transform(countryCode.begin(), countryCode.end(), countryCode.begin(), ::tolower);
 
         double rankChangePercent = rankChangeRatio * 100.;
-        if (!isTop)
-        {
-            rankChangePercent = 0. - rankChangePercent;
-        }
 
         description << "**" << j << ".** :flag_" << countryCode << ": **[" << username << "](https://osu.ppy.sh/users/" << userID << "/osu)** **(" << performancePoints << "pp | " << accuracy << "% | " << hoursPlayed << "hrs)**\n";
-        description << "▸ Rank " << (isTop ? "increased" : "decreased") << " by " << rankChangePercent << "% (#" << yesterdayRank << " → #" << currentRank << ")\n";
+        description << "▸ Rank " << (isTop ? "increased" : "dropped") << " from #" << yesterdayRank << " to #" << currentRank << " (" << rankChangePercent << "%)\n";
 
         ++j;
     }
@@ -451,4 +526,36 @@ ProfilePicture Bot::getScrapePlayersEmbedThumbnail(nlohmann::json jsonUsersCompa
     }
 
     return ProfilePicture("https://a.ppy.sh/2?1657169614.png");
+}
+
+/**
+ * Create scrapePlayers action row.
+ */
+dpp::component Bot::createScrapePlayersActionRow()
+{
+    dpp::component firstRangeButton;
+    firstRangeButton.set_type(dpp::cot_button);
+    firstRangeButton.set_label("#1 - #" + std::to_string(k_firstRangeMax));
+    firstRangeButton.set_style(dpp::cos_primary);
+    firstRangeButton.set_id(k_firstRangeButtonID);
+
+    dpp::component secondRangeButton;
+    secondRangeButton.set_type(dpp::cot_button);
+    secondRangeButton.set_label("#" + std::to_string(k_firstRangeMax + 1) + " - #" + std::to_string(k_secondRangeMax));
+    secondRangeButton.set_style(dpp::cos_primary);
+    secondRangeButton.set_id(k_secondRangeButtonID);
+
+    dpp::component thirdRangeButton;
+    thirdRangeButton.set_type(dpp::cot_button);
+    thirdRangeButton.set_label("#" + std::to_string(k_secondRangeMax + 1) + " - #" + std::to_string(k_thirdRangeMax));
+    thirdRangeButton.set_style(dpp::cos_primary);
+    thirdRangeButton.set_id(k_thirdRangeButtonID);
+
+    dpp::component actionRow;
+    actionRow.set_type(dpp::cot_action_row);
+    actionRow.add_component(firstRangeButton);
+    actionRow.add_component(secondRangeButton);
+    actionRow.add_component(thirdRangeButton);
+
+    return actionRow;
 }

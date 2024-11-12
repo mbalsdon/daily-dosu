@@ -59,9 +59,12 @@ public:
         std::stringstream ss;
         ss << "[" << std::put_time(std::localtime(&time), "%Y-%m-%d %H:%M:%S") << "." << std::setfill('0') << std::setw(3) << nowMs.count() << "] ";
         ss << "[" << levelToString(level) << "] ";
-        ss << "[" << threadID << "] ";
-        ss << "[" << location.file << ":" << location.line << "] ";
-        ss << "[" << location.function << "] ";
+        if (m_logLevel <= Level::DEBUG)
+        {
+            ss << "[" << threadID << "] ";
+            ss << "[" << location.file << ":" << location.line << "] ";
+            ss << "[" << location.function << "] ";
+        }
 
         // Append messages
         (ss << ... << std::forward<Args>(args)) << std::endl;
