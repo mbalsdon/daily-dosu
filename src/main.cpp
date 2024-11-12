@@ -7,13 +7,9 @@
 
 #include <dpp/nlohmann/json.hpp>
 
-#include <iostream>
 #include <functional>
 #include <thread>
 #include <chrono>
-#include <filesystem>
-#include <fstream>
-#include <string>
 
 /**
  * Entrypoint.
@@ -27,14 +23,13 @@ int main(int argc, char const *argv[])
     }
 
     // Load environment variables
-    if (!std::filesystem::exists(k_dosuConfigFilePath))
+    if (!DosuConfig::configExists())
     {
-        // TODO: Setup tool to create a config
-        LOG_ERROR("Cannot find ", k_dosuConfigFilePath, "! Exiting...");
-        return 1;
+        LOG_WARN("Cannot find config file! Running setup tool...");
+        DosuConfig::setupConfig();
+        return 0;
     }
-
-    DosuConfig::load(k_dosuConfigFilePath);
+    DosuConfig::load();
 
     // Set log level
     Logger::getInstance().setLogLevel(DosuConfig::logLevel);
@@ -61,13 +56,8 @@ int main(int argc, char const *argv[])
     return 0;
 }
 
-// TODO: DosuConfig setup
-// // just construct in main
-// // constructor checks file is valid; if not, prompt for cmd setup tool (run if Y exit if N)
-// // constructor loads file
-// // also move runHour vals (main) to dosuconfig
-
 // TODO: touchups
+// // 0 agnel dm
 // // 1 prevent bot spam (X commands per user per time, Y commands per channel per time)
 // // // how to impl? burst is fine but wanna prevent constant spam
 // // 2 other general security features to have?

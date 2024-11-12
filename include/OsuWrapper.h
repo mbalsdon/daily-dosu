@@ -28,7 +28,6 @@ private:
     CURL* m_curlHandle;
     std::string m_clientID;
     std::string m_clientSecret;
-    std::string m_clientRedirectURI;
     int m_apiCooldownMs;
     OAuthToken m_accessToken;
 };
