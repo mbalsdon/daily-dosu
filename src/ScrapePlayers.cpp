@@ -105,7 +105,7 @@ void scrapePlayers()
         throw std::runtime_error(reason);
     }
 
-    usersFullJsonFile << jsonUsers.dump(2) << std::endl;
+    usersFullJsonFile << jsonUsers.dump(4) << std::endl;
     usersFullJsonFile.close();
     LOG_DEBUG("Finished writing user data to ", k_usersFullFilePath.string(), "!");
 
@@ -188,7 +188,7 @@ void scrapePlayers()
         throw std::runtime_error(reason);
     }
 
-    usersCompactJsonFile << compactUsersJson.dump(2) << std::endl;
+    usersCompactJsonFile << compactUsersJson.dump(4) << std::endl;
     usersCompactJsonFile.close();
     LOG_DEBUG("Finished writing user data to ", k_usersCompactFilePath.string(), "!");
 }

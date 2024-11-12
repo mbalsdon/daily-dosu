@@ -56,7 +56,7 @@ void ServerConfig::load()
                 throw std::runtime_error(reason);
             }
             nlohmann::json jsonNewConfig = {{k_serverConfigChannelsKey, nlohmann::json::array()}};
-            newConfigFile << jsonNewConfig.dump(2) << std::endl;
+            newConfigFile << jsonNewConfig.dump(4) << std::endl;
             newConfigFile.close();
         }
 
@@ -105,7 +105,7 @@ void ServerConfig::save()
         tmpFilePath.replace_extension(".tmp");
 
         std::ofstream tmpFile(tmpFilePath);
-        tmpFile << jsonServerConfig.dump(2);
+        tmpFile << jsonServerConfig.dump(4);
         tmpFile.flush();
         tmpFile.close();
 
