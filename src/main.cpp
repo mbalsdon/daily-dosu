@@ -40,12 +40,9 @@ int main(int argc, char const *argv[])
     std::this_thread::sleep_for(std::chrono::seconds(7));
 
     // Start jobs
-    int scrapeHour = 0;
-    DailyJob scrapePlayersJob(scrapeHour, "scrapePlayers", scrapePlayers, [&bot, scrapeHour]() { bot.scrapePlayersCallback(scrapeHour); });
+    DailyJob scrapePlayersJob(DosuConfig::scrapePlayersRunHour, "scrapePlayers", scrapePlayers, [&bot]() { bot.scrapePlayersCallback(); });
     std::thread scrapePlayersThread(&DailyJob::start, &scrapePlayersJob);
-
-    int backupHour = 23;
-    DailyJob backupServerConfigJob(backupHour, "backupServerConfig", [&bot]() { bot.backupServerConfig(); }, nullptr);
+    DailyJob backupServerConfigJob(DosuConfig::backupServerConfigRunHour, "backupServerConfig", [&bot]() { bot.backupServerConfig(); }, nullptr);
     std::thread backupServerConfigThread(&DailyJob::start, &backupServerConfigJob);
 
     // Wait on threads
@@ -56,23 +53,7 @@ int main(int argc, char const *argv[])
     return 0;
 }
 
-// TODO: touchups
-// // 0 agnel dm
-// // 1 prevent bot spam (X commands per user per time, Y commands per channel per time)
-// // // how to impl? burst is fine but wanna prevent constant spam
-// // 2 other general security features to have?
-// // 3 manual run cmd (allowed user id in dosu_config)
-// // 4 help command
-// // 5 pls shilling (kofi?)
-// // 6 go through TODO/FUTURE/FIXME, any other necessary cleanups
-
-// TODO: release prep
-// // test e2e alt acct
-// // readme (what, why, contributing, self-setup)
-// // run for a few days; in a few servers (test+friend)
-// // // probably want an eth line instead of wlan
-// // email peppy ratelimit increase
-// // if all good, le reddit
+// TODO: move img links to local
 
 // FUTURE: new job: highest play today
 // // https://github.com/Ameobea/osutrack-api

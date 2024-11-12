@@ -23,6 +23,10 @@ std::chrono::minutes minutesUntil(int hour)
     }
 
     int minutesUntil = (hoursUntil * 60) - currMinute;
+    if (minutesUntil < 0)
+    {
+        minutesUntil += 1440; // 24 hours
+    }
 
     return std::chrono::minutes(minutesUntil);
 }
@@ -40,7 +44,7 @@ DailyJob::DailyJob(int hour, std::string name, std::function<void()> job, std::f
     if (!job)
     {
         std::string reason = "DailyJob::DailyJob - job cannot be nullptr!";
-        throw std::runtime_error(reason);
+        throw std::invalid_argument(reason);
     }
 
     if ((hour < 0) || (hour > 23))

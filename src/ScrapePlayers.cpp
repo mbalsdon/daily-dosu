@@ -42,10 +42,18 @@ void scrapePlayers()
     std::size_t numIDs = k_getRankingIDMaxPage * k_getRankingIDMaxNumIDs;
 
     // Grab user IDs
+    size_t count = 0;
     std::vector<UserID> userIDs;
     userIDs.reserve(numIDs);
     for (Page page = 0; page < k_getRankingIDMaxPage; ++page)
     {
+        // Log once in a while so we know we're not dead
+        if ((count % (k_getRankingIDMaxPage / 10)) == 0)
+        {
+            LOG_INFO("Fetching user IDs - progress: ", count, "/", k_getRankingIDMaxPage);
+        }
+        ++count;
+
         std::vector<UserID> pageIDs;
         pageIDs.reserve(k_getRankingIDMaxNumIDs);
         if (!osu.getRankingIDs(page, pageIDs, k_getRankingIDMaxNumIDs))
@@ -59,13 +67,13 @@ void scrapePlayers()
 
     // Grab user data and calculate associated rank change ratio
     nlohmann::json jsonUsers = nlohmann::json::array();
-    size_t count = 0;
+    count = 0;
     for (const UserID& userID : userIDs)
     {
         // Log once in a while so we know we're not dead
         if (count % k_getRankingIDMaxNumIDs == 0)
         {
-            LOG_INFO("Progress: ", count, "/", numIDs);
+            LOG_INFO("Fetching user data - progress: ", count, "/", numIDs);
         }
         ++count;
 
