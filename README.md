@@ -26,7 +26,7 @@ I have only tested on Linux. If you try running on other platforms, let me know 
 3. Configure the project:
     - `mkdir <build folder path> && cd <build folder path> && cmake <daily-dosu path>`
 4. Compile and run the project:
-    - `make -j$(($(nproc)+1))`
+    - `` make -j`nproc` ``
     - `./daily-dosu`
 
 

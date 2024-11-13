@@ -7,7 +7,7 @@
 
 namespace Detail
 {
-std::chrono::minutes minutesUntil(int hour)
+std::chrono::seconds secondsUntil(int hour)
 {
     auto now = std::chrono::system_clock::now();
     auto ttNow = std::chrono::system_clock::to_time_t(now);
@@ -15,6 +15,7 @@ std::chrono::minutes minutesUntil(int hour)
 
     int currHour = localTime.tm_hour;
     int currMinute = localTime.tm_min;
+    int currSecond = localTime.tm_sec;
 
     int hoursUntil = hour - currHour;
     if (hoursUntil < 0)
@@ -28,7 +29,13 @@ std::chrono::minutes minutesUntil(int hour)
         minutesUntil += 1440; // 24 hours
     }
 
-    return std::chrono::minutes(minutesUntil);
+    int secondsUntil = (minutesUntil * 60) - currSecond;
+    if (secondsUntil < 0)
+    {
+        secondsUntil += 86400; // 24 hours
+    }
+
+    return std::chrono::seconds(secondsUntil);
 }
 } /* namespace Detail */
 
@@ -71,10 +78,10 @@ void DailyJob::start()
             while (true)
             {
                 // Sleep until next scheduled run
-                std::chrono::minutes minutesUntilNextRun = Detail::minutesUntil(m_hour);
-                double hoursUntilNextRun = std::chrono::duration<double, std::ratio<60>>(minutesUntilNextRun).count() / 60.;
+                std::chrono::seconds secondsUntilNextRun = Detail::secondsUntil(m_hour);
+                double hoursUntilNextRun = static_cast<double>(secondsUntilNextRun.count()) / 3600.;
                 LOG_DEBUG(m_name, " sleeping for ", hoursUntilNextRun, " hours before running again...");
-                std::this_thread::sleep_for(minutesUntilNextRun);
+                std::this_thread::sleep_for(secondsUntilNextRun);
 
                 // Run job, reporting time taken (not high precision)
                 LOG_INFO(m_name, " beginning execution...");
@@ -90,6 +97,11 @@ void DailyJob::start()
                     LOG_DEBUG("Executing callback for ", m_name, "...");
                     m_jobCallback();
                 }
+
+                // FIXME: Time calculation is only precise to seconds, so if the job takes less than 1 second it will run again immediately.
+                //        Just sleep here for now to avoid that.
+                LOG_DEBUG("Job complete - sleeping for one second...");
+                std::this_thread::sleep_for(std::chrono::seconds(1));
             }
         }).detach();
 }
