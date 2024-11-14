@@ -53,7 +53,7 @@ int main(int argc, char const *argv[])
     return 0;
 }
 
-// TODO: move img links to local
+// FUTURE: parallelize scrapeplayers if necessary
 
 // FUTURE: new job: highest play today
 // // https://github.com/Ameobea/osutrack-api
