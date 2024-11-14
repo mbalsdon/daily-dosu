@@ -59,7 +59,8 @@ constexpr std::size_t k_firstRangeMax = 100;
 constexpr std::size_t k_secondRangeMax = 1000;
 constexpr std::size_t k_thirdRangeMax = 10000;
 
-constexpr std::size_t k_numDisplayUsers = 20;
+constexpr std::size_t k_numDisplayUsersTop = 15;
+constexpr std::size_t k_numDisplayUsersBottom = 5;
 
 const std::string k_firstRangeKey = "first_range";
 const std::string k_secondRangeKey = "second_range";

@@ -42,7 +42,7 @@ void scrapePlayers()
     std::size_t numIDs = k_getRankingIDMaxPage * k_getRankingIDMaxNumIDs;
 
     // Grab user IDs
-    size_t count = 0;
+    std::size_t count = 0;
     std::vector<UserID> userIDs;
     userIDs.reserve(numIDs);
     for (Page page = 0; page < k_getRankingIDMaxPage; ++page)
@@ -118,6 +118,7 @@ void scrapePlayers()
     LOG_DEBUG("Finished writing user data to ", k_usersFullFilePath.string(), "!");
 
     // Get top users from each rank range
+    std::size_t numDisplayUsers = k_numDisplayUsersTop + k_numDisplayUsersBottom;
     nlohmann::json topUsersFirstRangeJson = nlohmann::json::array();
     nlohmann::json topUsersSecondRangeJson = nlohmann::json::array();
     nlohmann::json topUsersThirdRangeJson = nlohmann::json::array();
@@ -125,18 +126,18 @@ void scrapePlayers()
     {
         Rank userRank = jsonUser.at(k_currentRankKey).get<Rank>();
 
-        if ((topUsersFirstRangeJson.size() < k_numDisplayUsers) &&
+        if ((topUsersFirstRangeJson.size() < numDisplayUsers) &&
             (userRank < k_firstRangeMax))
         {
             topUsersFirstRangeJson.push_back(jsonUser);
         }
-        else if ((topUsersSecondRangeJson.size() < k_numDisplayUsers) &&
+        else if ((topUsersSecondRangeJson.size() < numDisplayUsers) &&
                  (userRank >= k_firstRangeMax) &&
                  (userRank < k_secondRangeMax))
         {
             topUsersSecondRangeJson.push_back(jsonUser);
         }
-        else if ((topUsersThirdRangeJson.size() < k_numDisplayUsers) &&
+        else if ((topUsersThirdRangeJson.size() < numDisplayUsers) &&
                  (userRank >= k_secondRangeMax) &&
                  (userRank < k_thirdRangeMax))
         {
@@ -153,18 +154,18 @@ void scrapePlayers()
         const auto& jsonUser = *it;
         Rank userRank = jsonUser.at(k_currentRankKey).get<Rank>();
 
-        if ((bottomUsersFirstRangeJson.size() < k_numDisplayUsers) &&
+        if ((bottomUsersFirstRangeJson.size() < numDisplayUsers) &&
             (userRank < k_firstRangeMax))
         {
             bottomUsersFirstRangeJson.push_back(jsonUser);
         }
-        else if ((bottomUsersSecondRangeJson.size() < k_numDisplayUsers) &&
+        else if ((bottomUsersSecondRangeJson.size() < numDisplayUsers) &&
                  (userRank >= k_firstRangeMax) &&
                  (userRank < k_secondRangeMax))
         {
             bottomUsersSecondRangeJson.push_back(jsonUser);
         }
-        else if ((bottomUsersThirdRangeJson.size() < k_numDisplayUsers) &&
+        else if ((bottomUsersThirdRangeJson.size() < numDisplayUsers) &&
                  (userRank >= k_secondRangeMax) &&
                  (userRank < k_thirdRangeMax))
         {
