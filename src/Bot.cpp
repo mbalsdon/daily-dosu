@@ -409,7 +409,7 @@ dpp::embed Bot::createScrapePlayersEmbed(RankRange rankRange, nlohmann::json jso
     std::string footerText = "Runs every day at " + Detail::toHourString(hour) + "PST";
     std::string footerIcon = k_twemojiClockPrefix + Detail::toHexString(Detail::convertTo12Hour(hour) - 1) + k_twemojiClockSuffix;
     dpp::embed embed = dpp::embed()
-        .set_author("Here's your daily dose of osu!", "https://github.com/mbalsdon/daily-dosu", "https://spreadnuts.s-ul.eu/HDlrjbqe.png") // zesty ahh bot
+        .set_author("Here's your daily dose of osu!", "https://github.com/mbalsdon/daily-dosu", k_iconImgUrl) // zesty ahh bot
         .set_timestamp(time(0))
         .set_footer(
             dpp::embed_footer()
@@ -515,10 +515,11 @@ void Bot::addPlayersToDescription(std::stringstream& description, nlohmann::json
 }
 
 /**
- * Return pfp link of first valid player in rank increase section.
+ * Return pfp link of first valid player.
  */
 ProfilePicture Bot::getScrapePlayersEmbedThumbnail(nlohmann::json jsonUsersCompact, RankRange rankRange)
 {
+    // Try increase players
     nlohmann::json jsonUsers = jsonUsersCompact.at(Detail::rankRangeToKey(rankRange)).at(k_topUsersKey);
     for (const auto& jsonUser : jsonUsers)
     {
@@ -527,10 +528,33 @@ ProfilePicture Bot::getScrapePlayersEmbedThumbnail(nlohmann::json jsonUsersCompa
             continue;
         }
 
+        if (jsonUser.at(k_rankChangeRatioKey).get<RankChangeRatio>() <= 0.)
+        {
+            break;
+        }
+
         return jsonUser.at(k_pfpLinkKey).get<ProfilePicture>();
     }
 
-    return ProfilePicture("https://a.ppy.sh/2?1657169614.png");
+    // Try decrease players
+    jsonUsers = jsonUsersCompact.at(Detail::rankRangeToKey(rankRange)).at(k_bottomUsersKey);
+    for (const auto& jsonUser : jsonUsers)
+    {
+        if (Detail::isJsonUserInvalid(jsonUser))
+        {
+            continue;
+        }
+
+        if (jsonUser.at(k_rankChangeRatioKey).get<RankChangeRatio>() >= 0.)
+        {
+            break;
+        }
+
+        return jsonUser.at(k_pfpLinkKey).get<ProfilePicture>();
+    }
+
+    // Default
+    return ProfilePicture(k_defaultEmbedImgUrl);
 }
 
 /**

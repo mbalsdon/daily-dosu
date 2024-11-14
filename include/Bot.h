@@ -12,6 +12,8 @@
 #include <unordered_map>
 #include <chrono>
 
+const std::string k_iconImgUrl = "https://spreadnuts.s-ul.eu/HDlrjbqe.png";
+const std::string k_defaultEmbedImgUrl = "https://osu.ppy.sh/images/layout/avatar-guest.png";
 const std::string k_twemojiClockPrefix = "https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f55";
 const std::string k_twemojiClockSuffix = ".png";
 
