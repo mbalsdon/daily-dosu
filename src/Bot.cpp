@@ -460,7 +460,7 @@ void Bot::addPlayersToDescription(std::stringstream& description, nlohmann::json
     nlohmann::json jsonUsers = jsonUsersCompact.at(Detail::rankRangeToKey(rankRange)).at(usersKey);
 
     // Add valid players to description
-    std::size_t displayUsersMax = k_numDisplayUsers / 2;
+    std::size_t displayUsersMax = (isTop ? k_numDisplayUsersTop : k_numDisplayUsersBottom);
     std::size_t j = 1;
     for (std::size_t i = 0; i < displayUsersMax; ++i)
     {
@@ -506,6 +506,11 @@ void Bot::addPlayersToDescription(std::stringstream& description, nlohmann::json
         description << "▸ Rank " << (isTop ? "increased" : "dropped") << " from #" << yesterdayRank << " to #" << currentRank << " (" << rankChangePercent << "%)\n";
 
         ++j;
+    }
+
+    if (j == 1)
+    {
+        description << "Looks like nobody " << (isTop ? "gained" : "lost") << " ranks today... :shrug:\n";
     }
 }
 
