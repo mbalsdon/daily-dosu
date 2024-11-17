@@ -53,10 +53,18 @@ int main(int argc, char const *argv[])
     return 0;
 }
 
-// FUTURE: parallelize scrapeplayers if necessary
-
 // FUTURE: new job: highest play today
 // // https://github.com/Ameobea/osutrack-api
 // // "Get the best plays by pp for all users in a given mode"
 
 // FUTURE: move to sqlite3 you chud
+
+// FUTURE: country
+
+// FUTURE: parallelize scrapeplayers
+// // how does osu-web update rank history
+
+// FUTURE: bot makerequest if necessary
+// // takes fn as param
+// // spawn thread for fn param s.t. each req is executing/retrying concurrently
+// // on err (5xx), thread yield if delay time (exponential backoff) hasn't passed
