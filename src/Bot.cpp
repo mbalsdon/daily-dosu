@@ -237,7 +237,13 @@ void Bot::start()
             {
                 message.embeds.push_back(m_thirdRangeEmbed);
             }
-            m_bot.message_edit(message);
+            m_bot.message_edit(message, [buttonID](const dpp::confirmation_callback_t& callback)
+            {
+                if (callback.is_error())
+                {
+                    LOG_WARN("Failed to edit message after button ", buttonID, " was pressed; ", callback.get_error().message);
+                }
+            });
             event.reply();
         }
     });
@@ -406,7 +412,7 @@ dpp::embed Bot::createScrapePlayersEmbed(RankRange rankRange, nlohmann::json jso
 
     // Add static embed fields
     int hour = DosuConfig::scrapePlayersRunHour;
-    std::string footerText = "Runs every day at " + Detail::toHourString(hour) + "PST";
+    std::string footerText = "Runs every day at " + Detail::toHourString(hour) + "PST"; // FIXME: UTC
     std::string footerIcon = k_twemojiClockPrefix + Detail::toHexString(Detail::convertTo12Hour(hour) - 1) + k_twemojiClockSuffix;
     dpp::embed embed = dpp::embed()
         .set_author("Here's your daily dose of osu!", "https://github.com/mbalsdon/daily-dosu", k_iconImgUrl) // zesty ahh bot

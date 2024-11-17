@@ -7,6 +7,9 @@
 #include <fstream>
 #include <filesystem>
 #include <iostream>
+#include <chrono>
+#include <ctime>
+
 
 int DosuConfig::logLevel;
 std::string DosuConfig::discordBotToken;
@@ -15,6 +18,40 @@ std::string DosuConfig::osuClientSecret;
 int DosuConfig::osuApiCooldownMs;
 int DosuConfig::scrapePlayersRunHour;
 int DosuConfig::backupServerConfigRunHour;
+
+namespace Detail
+{
+int utcToLocal(int utcHour)
+{
+    auto now = std::chrono::system_clock::now();
+    auto nowTt = std::chrono::system_clock::to_time_t(now);
+
+    std::tm localTm = *std::localtime(&nowTt);
+    std::tm utcTm = *std::gmtime(&nowTt);
+
+    int offset = localTm.tm_hour - utcTm.tm_hour;
+    if (offset > 12)
+    {
+        offset -= 24;
+    }
+    else if (offset < -12)
+    {
+        offset += 24;
+    }
+
+    int localHour = utcHour + offset;
+    if (localHour >= 24)
+    {
+        localHour -= 24;
+    }
+    else if (localHour < 0)
+    {
+        localHour += 24;
+    }
+
+    return localHour;
+}
+}
 
 /**
  * Load JSON configuration.
@@ -80,8 +117,8 @@ void DosuConfig::setupConfig()
     nlohmann::json newConfigJson;
     newConfigJson[k_logLevelKey] = 1;
     newConfigJson[k_osuApiCooldownMsKey] = 1000;
-    newConfigJson[k_scrapePlayersRunHourKey] = 0;
     newConfigJson[k_backupServerConfigRunHourKey] = 23;
+    newConfigJson[k_scrapePlayersRunHourKey] = Detail::utcToLocal(6);
 
     std::string botToken;
     std::string clientID;

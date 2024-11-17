@@ -241,8 +241,8 @@ bool OsuWrapper::getUser(UserID userID, DosuUser& user)
         user.username = responseDataJson.at("username").get<Username>();
         user.countryCode = responseDataJson.at("country_code").get<CountryCode>();
         user.pfpLink = responseDataJson.at("avatar_url").get<ProfilePicture>();
-        user.currentRank = responseDataJson.at("rank_history").at("data")[89].get<Rank>();
-        user.yesterdayRank = responseDataJson.at("rank_history").at("data")[88].get<Rank>();
+        user.currentRank = responseDataJson.at("rank_history").at("data")[88].get<Rank>();
+        user.yesterdayRank = responseDataJson.at("rank_history").at("data")[87].get<Rank>();
         user.hoursPlayed = responseDataJson.at("statistics").at("play_time").get<uint64_t>() / 3600; // FIXME: round insteead of truncate
         user.performancePoints = responseDataJson.at("statistics").at("pp").get<PerformancePoints>();
         user.accuracy = responseDataJson.at("statistics").at("hit_accuracy").get<Accuracy>();
