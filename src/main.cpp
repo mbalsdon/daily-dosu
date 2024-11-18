@@ -1,70 +1,127 @@
 #include "Bot.h"
 #include "DosuConfig.h"
 #include "DailyJob.h"
-#include "ScrapePlayers.h"
+#include "ScrapeRankings.h"
 #include "Util.h"
 #include "Logger.h"
-
-#include <dpp/nlohmann/json.hpp>
+#include "OsuWrapper.h"
+#include "RankingsDatabaseManager.h"
+#include "BotConfigDatabaseManager.h"
 
 #include <functional>
 #include <thread>
 #include <chrono>
+#include <atomic>
+#include <csignal>
+#include <condition_variable>
+
+namespace
+{
+    std::atomic<bool> g_bShutdown(false);
+    std::condition_variable g_shutdownCV;
+    std::mutex g_shutdownMtx;
+
+    /**
+     * Handle basic signals.
+     */
+    void signalHandler(int signum)
+    {
+        if (signum == SIGINT || signum == SIGTERM)
+        {
+            g_bShutdown = true;
+            g_shutdownCV.notify_all();
+        }
+    }
+
+    /**
+     * Set up program behaviour for signals.
+     */
+    void setupSignalHandling()
+    {
+        struct sigaction sa;
+        sa.sa_handler = signalHandler; // Route signals
+        sigemptyset(&sa.sa_mask); // Don't block any signals
+        sa.sa_flags = 0; // Default behaviour when signals are received
+
+        sigaction(SIGINT, &sa, nullptr); // Register SIGINT (e.g. CTRL+C)
+        sigaction(SIGTERM, &sa, nullptr); // Register SIGTERM
+
+        signal(SIGPIPE, SIG_IGN); // Ignore SIGPIPE
+    }
+}
 
 /**
  * Entrypoint.
  */
-int main(int argc, char const *argv[])
+int main()
 {
-    // Create necessary files/directories
-    if (!std::filesystem::exists(k_dataDir))
+    try
     {
-        std::filesystem::create_directory(k_dataDir);
-    }
+        // Setup signal handling
+        setupSignalHandling();
 
-    // Load environment variables
-    if (!DosuConfig::configExists())
-    {
-        LOG_WARN("Cannot find config file! Running setup tool...");
-        DosuConfig::setupConfig();
+        // Create necessary files/directories
+        if (!std::filesystem::exists(k_dataDir))
+        {
+            std::filesystem::create_directory(k_dataDir);
+        }
+
+        // Load environment variables
+        if (!std::filesystem::exists(k_dosuConfigFilePath))
+        {
+            LOG_WARN("Cannot find config file! Running setup tool...");
+            DosuConfig::setupConfig(k_dosuConfigFilePath);
+            return 0;
+        }
+        DosuConfig::load(k_dosuConfigFilePath);
+
+        // Initialize services
+        Logger::getInstance().setLogLevel(DosuConfig::logLevel);
+
+        RankingsDatabaseManager& rankingsDbm = RankingsDatabaseManager::getInstance();
+        rankingsDbm.initialize(DosuConfig::rankingsDatabaseFilePath);
+
+        BotConfigDatabaseManager& botConfigDbm = BotConfigDatabaseManager::getInstance();
+        botConfigDbm.initialize(DosuConfig::botConfigDatabaseFilePath);
+
+        // Start bot
+        Bot bot(DosuConfig::discordBotToken, rankingsDbm, botConfigDbm);
+        bot.start();
+
+        // Start jobs
+        DailyJob scrapeRankingsJob(
+            DosuConfig::scrapeRankingsRunHour,
+            "scrapeRankings",
+            [&rankingsDbm] { scrapeRankings(rankingsDbm); },
+            [&bot]() { bot.scrapeRankingsCallback(); }
+        );
+        scrapeRankingsJob.start();
+
+        // Wait for shutdown signal
+        {
+            std::unique_lock<std::mutex> lock(g_shutdownMtx);
+            g_shutdownCV.wait(lock, [] { return g_bShutdown.load(); });
+        }
+
+        // Clean everything up
+        LOG_INFO("Cleaning up resources and connections - PLEASE DON'T SHUT DOWN...");
+        scrapeRankingsJob.stop();
+        bot.stop();
+        rankingsDbm.cleanup();
+        botConfigDbm.cleanup();
+
+        LOG_INFO("Cleanup complete! Exiting...");
+        Logger::getInstance().setLogLevel(Logger::Level::ERROR); // Quiet destructor logs; we already cleaned
         return 0;
     }
-    DosuConfig::load();
-
-    // Set log level
-    Logger::getInstance().setLogLevel(DosuConfig::logLevel);
-
-    // Start bot and give it some time to start
-    Bot bot(DosuConfig::discordBotToken);
-    std::thread botThread(&Bot::start, &bot);
-    std::this_thread::sleep_for(std::chrono::seconds(7));
-
-    // Start jobs
-    DailyJob scrapePlayersJob(DosuConfig::scrapePlayersRunHour, "scrapePlayers", scrapePlayers, [&bot]() { bot.scrapePlayersCallback(); });
-    std::thread scrapePlayersThread(&DailyJob::start, &scrapePlayersJob);
-    DailyJob backupServerConfigJob(DosuConfig::backupServerConfigRunHour, "backupServerConfig", [&bot]() { bot.backupServerConfig(); }, nullptr);
-    std::thread backupServerConfigThread(&DailyJob::start, &backupServerConfigJob);
-
-    // Wait on threads
-    botThread.join();
-    scrapePlayersThread.join();
-    backupServerConfigThread.join();
-
-    return 0;
+    catch (const std::exception& e)
+    {
+        LOG_ERROR("Fatal error: ", e.what());
+        return 1;
+    }
+    catch (...)
+    {
+        LOG_ERROR("Unknown fatal error occurrred!");
+        return 1;
+    }
 }
-
-// FUTURE: new job: highest play today
-// // https://github.com/Ameobea/osutrack-api
-// // "Get the best plays by pp for all users in a given mode"
-
-// FUTURE: move to sqlite3 you chud
-
-// FUTURE: country
-
-// FUTURE: parallelize scrapeplayers
-// // how does osu-web update rank history
-
-// FUTURE: bot makerequest if necessary
-// // takes fn as param
-// // spawn thread for fn param s.t. each req is executing/retrying concurrently
-// // on err (5xx), thread yield if delay time (exponential backoff) hasn't passed

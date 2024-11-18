@@ -44,13 +44,13 @@ If you want to contact me directly, my DMs are open on Discord @spreadnuts.
 ## Internals
 
 Core functionality can mainly be found in the following places:
-- **ScrapePlayers** - script that fetches user data for the top 10,000 osu! players.
+- **ScrapeRankings** - script that fetches user data for the top 10,000 osu! players.
 - **DailyJob** - implements a simple 24-hour job scheduler.
-- **Bot** - handles all user-facing logic and formatting.
+- **Bot** - DPP wrapper that handles all user-facing logic.
+- **RankingsDatabaseManager** - SQLiteCpp wrapper for storing user data.
+- **BotConfigDatabaseManager** - SQLiteCpp wrapper for storing Discord server configs (set by users).
 
-Currently, `ScrapePlayers` is the only "big" job that is undertaken. It is registered along with a callback from `Bot` as a `DailyJob`, thus the flow of execution is roughly:
-- Scheduler wakes up and runs `scrapePlayers`, which stores its results on disk in a JSON file.
-- On completion, `scrapePlayersCallback` runs, which loads the results from disk and formats them for Discord.
-- Results are sent to any subscribed chat channels (also held in JSON format on disk - logic can be found in `ServerConfig`).
-
-The data stored is not currently complex or large enough to warrant something like SQLite, but of course it may be necessary to move there in the future.
+Currently, `ScrapeRankings` is the only "big" job that is undertaken. It is registered along with a callback from `Bot` as a `DailyJob`, thus the flow of execution is roughly:
+- Scheduler wakes up and runs `scrapeRankings`, which stores its results on disk.
+- On completion, `scrapeRankingsCallback` runs, which loads the results from disk and formats them for Discord.
+- Results are sent to any subscribed chat channels.

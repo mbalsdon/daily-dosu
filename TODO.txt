@@ -1,0 +1,23 @@
+- TODO
+--- test & release
+--- optional gdrive backups
+--- country
+----- check what get rankings endpoint does with "country" param
+----- how to format this with new jobs in mind (look thru supported components)
+
+- MAYBE
+--- new jobs
+----- highest plays today (or something)
+------- https://github.com/Ameobea/osutrack-api
+------- "Get the best plays by pp for all users in a given mode"
+------- better to just grab recent tops from those w/ highest rank gain?
+----- anyone who broke a digit range (X reached 2 digit)
+----- how to format this? second action row with left/right buttons which switch between job embeds (incl. first action row)?
+------- look through supported components
+--- bot makerequest if necessary
+----- takes fn as param
+----- spawn thread for fn param s.t. each req is executing/retrying concurrently
+----- on err (5xx), thread yield if delay time (exponential backoff) hasn't passed
+--- optimize scrapeRankings more if bored
+----- add directly inserts to txn and commit after join, instead of writing to vector and re-reading
+----- chunking inserts with multivalue syntax
