@@ -5,22 +5,24 @@
 #include <nlohmann/json.hpp>
 
 #include <fstream>
-#include <filesystem>
 #include <iostream>
 #include <chrono>
 #include <ctime>
-
 
 int DosuConfig::logLevel;
 std::string DosuConfig::discordBotToken;
 std::string DosuConfig::osuClientID;
 std::string DosuConfig::osuClientSecret;
-int DosuConfig::osuApiCooldownMs;
-int DosuConfig::scrapePlayersRunHour;
-int DosuConfig::backupServerConfigRunHour;
+int DosuConfig::scrapeRankingsRunHour;
+std::filesystem::path DosuConfig::rankingsDatabaseFilePath;
+std::filesystem::path DosuConfig::botConfigDatabaseFilePath;
 
 namespace Detail
 {
+/**
+ * Convert given hour from UTC to system timezone.
+ * Thanks to the dev who put this on SO 14 years ago and thanks to Claude for feeding it to me!
+ */
 int utcToLocal(int utcHour)
 {
     auto now = std::chrono::system_clock::now();
@@ -56,69 +58,51 @@ int utcToLocal(int utcHour)
 /**
  * Load JSON configuration.
  */
-void DosuConfig::load()
+void DosuConfig::load(std::filesystem::path filePath)
 {
-    LOG_DEBUG("Loading config from ", k_dosuConfigFilePath);
+    LOG_DEBUG("Loading config from ", filePath);
 
+    // Read file
     nlohmann::json configDataJson;
-    std::ifstream inputFile(k_dosuConfigFilePath);
+    std::ifstream inputFile(filePath);
     if (!inputFile.is_open())
     {
-        std::string reason = std::string("DosuConfig::load - failed to open ").append(k_dosuConfigFilePath.string());
+        std::string reason = std::string("DosuConfig::load - failed to open ").append(filePath.string());
         throw std::runtime_error(reason);
     }
     inputFile >> configDataJson;
     inputFile.close();
 
-    DosuConfig::logLevel = configDataJson[k_logLevelKey];
+    // Store in memory
+    DosuConfig::logLevel = configDataJson.at(k_logLevelKey);
     if (DosuConfig::logLevel < 0 || DosuConfig::logLevel > 3)
     {
         LOG_WARN("Configured ", k_logLevelKey, " is out of bounds! Setting to 1...");
         DosuConfig::logLevel = 1;
     }
-    DosuConfig::discordBotToken = configDataJson[k_discordBotTokenKey];
-    DosuConfig::osuClientID = configDataJson[k_osuClientIdKey];
-    DosuConfig::osuClientSecret = configDataJson[k_osuClientSecretKey];
-    DosuConfig::osuApiCooldownMs = configDataJson[k_osuApiCooldownMsKey];
-    if (DosuConfig::osuApiCooldownMs < 0)
+    DosuConfig::discordBotToken = configDataJson.at(k_discordBotTokenKey);
+    DosuConfig::osuClientID = configDataJson.at(k_osuClientIdKey);
+    DosuConfig::osuClientSecret = configDataJson.at(k_osuClientSecretKey);
+    DosuConfig::scrapeRankingsRunHour = configDataJson.at(k_scrapeRankingsRunHourKey);
+    if (DosuConfig::scrapeRankingsRunHour < 0 || DosuConfig::scrapeRankingsRunHour > 23)
     {
-        LOG_WARN("Configured ", k_osuApiCooldownMsKey, " is out of bounds! Setting to 1000...");
-        DosuConfig::osuApiCooldownMs = 1000;
+        DosuConfig::scrapeRankingsRunHour = DosuConfig::scrapeRankingsRunHour % 24;
+        LOG_WARN("Configured ", k_scrapeRankingsRunHourKey, " is out of bounds! Normalizing to ", DosuConfig::scrapeRankingsRunHour, "...");
     }
-    DosuConfig::scrapePlayersRunHour = configDataJson[k_scrapePlayersRunHourKey];
-    if (DosuConfig::scrapePlayersRunHour < 0 || DosuConfig::scrapePlayersRunHour > 23)
-    {
-        DosuConfig::scrapePlayersRunHour = DosuConfig::scrapePlayersRunHour % 24;
-        LOG_WARN("Configured ", k_scrapePlayersRunHourKey, " is out of bounds! Normalizing to ", DosuConfig::scrapePlayersRunHour, "...");
-    }
-    DosuConfig::backupServerConfigRunHour = configDataJson[k_backupServerConfigRunHourKey];
-    if (DosuConfig::backupServerConfigRunHour < 0 || DosuConfig::backupServerConfigRunHour > 23)
-    {
-        DosuConfig::backupServerConfigRunHour = DosuConfig::backupServerConfigRunHour % 24;
-        LOG_WARN("Configured ", k_serverConfigChannelsKey, " is out of bounds! Normalizing to ", DosuConfig::backupServerConfigRunHour, "...");
-    }
-}
-
-/**
- * Check if config file exists.
- */
-bool DosuConfig::configExists()
-{
-    return std::filesystem::exists(k_dosuConfigFilePath);
+    DosuConfig::rankingsDatabaseFilePath = std::filesystem::path(configDataJson.at(k_rankingsDbFilePathKey));
+    DosuConfig::botConfigDatabaseFilePath = std::filesystem::path(configDataJson.at(k_botConfigDbFilePathKey));
 }
 
 /**
  * Create config from user input.
  */
-void DosuConfig::setupConfig()
+void DosuConfig::setupConfig(std::filesystem::path filePath)
 {
     LOG_DEBUG("Running config setup tool...");
 
     nlohmann::json newConfigJson;
     newConfigJson[k_logLevelKey] = 1;
-    newConfigJson[k_osuApiCooldownMsKey] = 1000;
-    newConfigJson[k_backupServerConfigRunHourKey] = 23;
-    newConfigJson[k_scrapePlayersRunHourKey] = Detail::utcToLocal(6);
+    newConfigJson[k_scrapeRankingsRunHourKey] = Detail::utcToLocal(5);
 
     std::string botToken;
     std::string clientID;
@@ -135,9 +119,11 @@ void DosuConfig::setupConfig()
     newConfigJson[k_discordBotTokenKey] = botToken;
     newConfigJson[k_osuClientIdKey] = clientID;
     newConfigJson[k_osuClientSecretKey] = clientSecret;
+    newConfigJson[k_rankingsDbFilePathKey] = k_dataDir / "rankings.db";
+    newConfigJson[k_botConfigDbFilePathKey] = k_dataDir / "bot_config.db";
 
-    std::ofstream outputFile(k_dosuConfigFilePath);
+    std::ofstream outputFile(filePath);
     outputFile << newConfigJson.dump(4) << std::endl;
 
-    std::cout << "Success! Some values have been set by default. Config can be found at " << k_dosuConfigFilePath << std::endl;
+    std::cout << "Success! Some values have been set by default. Config can be found at " << filePath << std::endl;
 }

@@ -1,3 +1,6 @@
 [submodule "lib/DPP"]
 	path = lib/DPP
 	url = https://github.com/brainboxdotcc/DPP.git
+[submodule "lib/SQLiteCpp"]
+	path = lib/SQLiteCpp
+	url = https://github.com/SRombauts/SQLiteCpp.git

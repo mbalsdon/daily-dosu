@@ -2,58 +2,69 @@
 #define __UTIL_H__
 
 #include <string>
-#include <cstdint>
 #include <cstddef>
+#include <cstdint>
 #include <filesystem>
 #include <chrono>
 
 /* - - - - - - - - Types - - - - - - - */
 
 typedef std::string OAuthToken;
-typedef uint16_t Page;
+typedef std::size_t Page;
 
-typedef uint32_t UserID;
+typedef int64_t UserID;
 typedef std::string Username;
 typedef std::string CountryCode;
 typedef std::string ProfilePicture;
-typedef uint32_t HoursPlayed;
-typedef uint32_t Rank;
-typedef uint32_t PerformancePoints;
+typedef int64_t PerformancePoints;
 typedef double Accuracy;
+typedef int64_t HoursPlayed;
+typedef int64_t Rank;
 
-typedef double RankChangeRatio;
-
-struct DosuUser
+struct RankingsUser
 {
-    UserID userID = 0;
+    UserID userID = -1;
     Username username = "";
     CountryCode countryCode = "";
     ProfilePicture pfpLink = "";
-    HoursPlayed hoursPlayed = 0;
-    Rank currentRank = 0;
-    Rank yesterdayRank = 0;
-    PerformancePoints performancePoints = 0;
-    Accuracy accuracy = 0.;
+    PerformancePoints performancePoints = -1;
+    Accuracy accuracy = -1.;
+    HoursPlayed hoursPlayed = -1;
+    Rank yesterdayRank = -1;
+    Rank currentRank = -1;
 
-    bool isEmpty() const { return userID == 0; }
-    void clear() { *this = DosuUser{}; }
+    bool isValid() const
+    {
+        return (
+            (userID > 0) &&
+            !username.empty() &&
+            !countryCode.empty() &&
+            !pfpLink.empty() &&
+            (performancePoints >= 0) &&
+            (accuracy >= 0.) &&
+            (hoursPlayed >= 0) &&
+            (currentRank >= 1)
+        );
+    }
+};
+
+struct RankImprovement
+{
+    RankingsUser user;
+    double relativeImprovement;
+};
+
+enum class RankRange
+{
+    First,
+    Second,
+    Third
 };
 
 /* - - - - - - Constants - - - - - - - */
 
 constexpr std::size_t k_getRankingIDMaxNumIDs = 50;
 constexpr std::size_t k_getRankingIDMaxPage = 200;
-
-const std::string k_userIDKey = "user_id";
-const std::string k_usernameKey = "username";
-const std::string k_countryCodeKey = "country_code";
-const std::string k_pfpLinkKey = "pfp_link";
-const std::string k_hoursPlayedKey = "hours_played";
-const std::string k_currentRankKey = "current_rank";
-const std::string k_yesterdayRankKey = "yesterday_rank";
-const std::string k_performancePointsKey = "performance_points";
-const std::string k_accuracyKey = "accuracy";
-const std::string k_rankChangeRatioKey = "rank_change_ratio";
 
 constexpr std::size_t k_firstRangeMax = 100;
 constexpr std::size_t k_secondRangeMax = 1000;
@@ -62,26 +73,24 @@ constexpr std::size_t k_thirdRangeMax = 10000;
 constexpr std::size_t k_numDisplayUsersTop = 15;
 constexpr std::size_t k_numDisplayUsersBottom = 5;
 
-const std::string k_firstRangeKey = "first_range";
-const std::string k_secondRangeKey = "second_range";
-const std::string k_thirdRangeKey = "third_range";
-
-const std::string k_topUsersKey = "top";
-const std::string k_bottomUsersKey = "bottom";
-
-const std::string k_serverConfigChannelsKey = "channels";
-
 const std::filesystem::path k_rootDir = std::filesystem::path(__FILE__).parent_path().parent_path();
 const std::filesystem::path k_dosuConfigFilePath = k_rootDir / "dosu_config.json";
-
 const std::filesystem::path k_dataDir = k_rootDir / "data";
-const std::filesystem::path k_usersFullFilePath = k_dataDir / "users_full.json";
-const std::filesystem::path k_usersCompactFilePath = k_dataDir / "users_compact.json";
-const std::filesystem::path k_serverConfigFilePath = k_dataDir / "server_config.json";
 
-const std::string k_serverConfigBackupSuffix = "__server_config_backup.json";
-constexpr const char* k_serverConfigBackupTimeFormat = "%Y-%m-%d_%H:%M:%S";
-const std::string k_serverConfigTimeRegex = "\\d{4}-\\d{2}-\\d{2}_\\d{2}:\\d{2}:\\d{2}";
-const std::chrono::hours k_serverConfigBackupExpiry = std::chrono::hours(24 * 14);
+const std::string k_cmdHelp = "help";
+const std::string k_cmdPing = "ping";
+const std::string k_cmdNewsletter = "newsletter";
+const std::string k_cmdSubscribe = "subscribe";
+const std::string k_cmdUnsubscribe = "unsubscribe";
+
+const std::string k_cmdHelpDesc = "List the bot's commands.";
+const std::string k_cmdPingDesc = "Check if the bot is alive.";
+const std::string k_cmdNewsletterDesc = "Display the daily newsletter.";
+const std::string k_cmdSubscribeDesc = "Enable daily newsletters for this channel.";
+const std::string k_cmdUnsubscribeDesc = "Disable daily newsletters for this channel.";
+
+const std::string k_firstRangeButtonID = "first_range_button";
+const std::string k_secondRangeButtonID = "second_range_button";
+const std::string k_thirdRangeButtonID = "third_range_button";
 
 #endif /* __UTIL_H__ */

@@ -2,106 +2,175 @@
 #include "Logger.h"
 
 #include <iostream>
-#include <chrono>
 #include <thread>
-
-namespace Detail
-{
-std::chrono::seconds secondsUntil(int hour)
-{
-    auto now = std::chrono::system_clock::now();
-    auto ttNow = std::chrono::system_clock::to_time_t(now);
-    auto localTime = *std::localtime(&ttNow);
-
-    int currHour = localTime.tm_hour;
-    int currMinute = localTime.tm_min;
-    int currSecond = localTime.tm_sec;
-
-    int hoursUntil = hour - currHour;
-    if (hoursUntil < 0)
-    {
-        hoursUntil += 24;
-    }
-
-    int minutesUntil = (hoursUntil * 60) - currMinute;
-    if (minutesUntil < 0)
-    {
-        minutesUntil += 1440; // 24 hours
-    }
-
-    int secondsUntil = (minutesUntil * 60) - currSecond;
-    if (secondsUntil < 0)
-    {
-        secondsUntil += 86400; // 24 hours
-    }
-
-    return std::chrono::seconds(secondsUntil);
-}
-} /* namespace Detail */
+#include <ctime>
+#include <utility>
 
 /**
  * DailyJob constructor.
  */
 DailyJob::DailyJob(int hour, std::string name, std::function<void()> job, std::function<void()> jobCallback)
-    : m_name(name)
-    , m_jobCallback(jobCallback)
+    : m_hour(normalizeHour(hour))
+    , m_name(std::move(name))
+    , m_job(std::move(job))
+    , m_jobCallback(std::move(jobCallback))
 {
-    LOG_DEBUG("Creating DailyJob instance for ", name, ", running at hour ", hour);
+    LOG_DEBUG("Creating DailyJob for ", m_name, ", running at hour ", m_hour);
 
-    if (!job)
+    if (!m_job)
     {
         std::string reason = "DailyJob::DailyJob - job cannot be nullptr!";
         throw std::invalid_argument(reason);
     }
-
-    if ((hour < 0) || (hour > 23))
-    {
-        hour = hour % 24;
-        LOG_WARN("Hour is out of bounds; normalizing to ", hour, "...");
-    }
-
-    m_hour = hour;
-    m_job = job;
 }
 
 /**
- * Starts the job scheduler.
- * Runs in a detached thread every day at the specified hour (system time).
- * If a callback is specified, it will run after each job completion.
+ * DailyJob destructor.
+ */
+DailyJob::~DailyJob()
+{
+    LOG_DEBUG("Destructing DailyJob ", m_name, "...");
+    stop();
+}
+
+/**
+ * Start the job scheduler.
  */
 void DailyJob::start()
 {
-    LOG_INFO("Running job \"", m_name, "\" at every ", m_hour, "th hour...");
-    std::thread(
-        [this]()
+    std::lock_guard<std::mutex> lock(m_jobMtx);
+
+    if (m_bRunning)
+    {
+        LOG_WARN("Job ", m_name, " is already running!");
+        return;
+    }
+
+    LOG_INFO("Running job ", m_name, " at every ", m_hour, "th hour...");
+    m_bRunning = true;
+    m_jobThread = std::make_unique<std::thread>(&DailyJob::runJobLoop, this);
+}
+
+/**
+ * Stop the job scheduler.
+ */
+void DailyJob::stop()
+{
+    {
+        std::lock_guard<std::mutex> lock(m_jobMtx);
+        if (!m_bRunning)
         {
-            while (true)
+            LOG_WARN("Job ", m_name, " is not running!");
+            return;
+        }
+        LOG_INFO("Halting job ", m_name, "...");
+        m_bRunning = false;
+    }
+
+    m_jobCV.notify_one();
+
+    if (m_jobThread && m_jobThread->joinable())
+    {
+        m_jobThread->join();
+        m_jobThread.reset();
+    }
+}
+
+/**
+ * Run job at scheduled time, looping until told to stop.
+ */
+void DailyJob::runJobLoop()
+{
+    LOG_DEBUG("Running job loop...");
+    while (m_bRunning)
+    {
+        // Sleep until next run
+        auto nextRun = calculateNextRun();
+        LOG_DEBUG(m_name, " sleeping for ", static_cast<double>(std::chrono::duration_cast<std::chrono::seconds>(nextRun - std::chrono::system_clock::now()).count()) / 3600., " hours...");
+        {
+            std::unique_lock<std::mutex> lock(m_jobMtx);
+            if (m_jobCV.wait_until(lock, nextRun, [this] { return !m_bRunning; }))
             {
-                // Sleep until next scheduled run
-                std::chrono::seconds secondsUntilNextRun = Detail::secondsUntil(m_hour);
-                double hoursUntilNextRun = static_cast<double>(secondsUntilNextRun.count()) / 3600.;
-                LOG_DEBUG(m_name, " sleeping for ", hoursUntilNextRun, " hours before running again...");
-                std::this_thread::sleep_for(secondsUntilNextRun);
-
-                // Run job, reporting time taken (not high precision)
-                LOG_INFO(m_name, " beginning execution...");
-                auto startTime = std::chrono::system_clock::now();
-                m_job();
-                auto endTime = std::chrono::system_clock::now();
-                auto duration = std::chrono::duration_cast<std::chrono::minutes>(endTime - startTime);
-                LOG_INFO(m_name, " finished execution! Time elapsed: ", duration.count(), " minutes.");
-
-                // Execute callback if it exists
-                if (m_jobCallback)
-                {
-                    LOG_DEBUG("Executing callback for ", m_name, "...");
-                    m_jobCallback();
-                }
-
-                // FIXME: Time calculation is only precise to seconds, so if the job takes less than 1 second it will run again immediately.
-                //        Just sleep here for now to avoid that.
-                LOG_DEBUG("Job complete - sleeping for one second...");
-                std::this_thread::sleep_for(std::chrono::seconds(1));
+                break;
             }
-        }).detach();
+        }
+
+        // Run job and callback
+        try
+        {
+            LOG_INFO(m_name, " beginning execution...");
+            auto startTime = std::chrono::steady_clock::now();
+
+            m_job();
+
+            auto endTime = std::chrono::steady_clock::now();
+            auto duration = std::chrono::duration_cast<std::chrono::minutes>(endTime - startTime);
+            LOG_INFO(m_name, " finished execution! Time elapsed: ", duration.count(), " minutes.");
+
+            if (m_jobCallback)
+            {
+                LOG_DEBUG("Executing callback for ", m_name, "...");
+                m_jobCallback();
+            }
+        }
+        catch(const std::exception& e)
+        {
+            LOG_ERROR("Caught error in job ", m_name, ": ", e.what());
+        }
+        catch (...)
+        {
+            LOG_ERROR("Unknown error in job ", m_name);
+        }
+        
+    }
+}
+
+/**
+ * WARNING: Does not account for system time changes during sleep (e.g. DST).
+ * 
+ * Calculate time until next run.
+ */
+std::chrono::system_clock::time_point DailyJob::calculateNextRun()
+{
+    auto now = std::chrono::system_clock::now();
+    auto currTime = std::chrono::system_clock::to_time_t(now);
+    std::tm localTime;
+
+    #ifdef _WIN32
+        localtime_s(&localTime, &currTime);
+    #else
+        localtime_r(&currTime, &localTime);
+    #endif
+
+    std::tm scheduledTime = localTime;
+    scheduledTime.tm_hour = m_hour;
+    scheduledTime.tm_min = 0;
+    scheduledTime.tm_sec = 0;
+
+    auto scheduledRun = std::chrono::system_clock::from_time_t(std::mktime(&scheduledTime));
+
+    if (now >= scheduledRun)
+    {
+        scheduledTime.tm_mday += 1;
+        scheduledRun = std::chrono::system_clock::from_time_t(std::mktime(&scheduledTime));
+    }
+
+    return scheduledRun;
+}
+
+/**
+ * Convert hour to 0-23 if it is out-of-bounds.
+ */
+int DailyJob::normalizeHour(int hour)
+{
+    if (hour < 0 || hour > 23)
+    {
+        int normalizedHour = (24 + (hour % 24)) % 24;
+        LOG_WARN("Hour is out of bounds, normalizing to ", normalizedHour, "...");
+        return normalizedHour;
+    }
+    else
+    {
+        return hour;
+    }
 }

@@ -20,6 +20,9 @@ struct SourceLocation
     {}
 };
 
+/**
+ * TODO: desc
+ */
 class Logger
 {
 public:
@@ -41,6 +44,11 @@ public:
     {
         m_logLevel = intToLevel(level);
     }
+    
+    void setLogLevel(Level level)
+    {
+        m_logLevel = level;
+    }
 
     template<typename... Args>
     void log(Level level, const SourceLocation& location, Args&&... args)
@@ -49,6 +57,7 @@ public:
         {
             return;
         }
+
         // Get stuff for log prefix
         auto now = std::chrono::system_clock::now();
         auto time = std::chrono::system_clock::to_time_t(now);
@@ -77,6 +86,8 @@ private:
     Logger() = default;
     Logger(const Logger&) = delete;
     Logger& operator=(const Logger&) = delete;
+    Logger(Logger&&) = delete;
+    Logger& operator=(Logger&&) = delete;
 
     static const char* levelToString(Level level)
     {
@@ -90,14 +101,16 @@ private:
         }
     }
 
-    static const Level intToLevel(int l)
+    static Level intToLevel(int l)
     {
-        if (l == 0) return Level::DEBUG;
-        if (l == 1) return Level::INFO;
-        if (l == 2) return Level::WARNING;
-        if (l == 3) return Level::ERROR;
-
-        return Level::INFO;
+        switch (l)
+        {
+        case 0: return Level::DEBUG;
+        case 1: return Level::INFO;
+        case 2: return Level::WARNING;
+        case 3: return Level::ERROR;
+        default: return Level::INFO;
+        }
     }
 
     Level m_logLevel = Level::INFO;

@@ -3,22 +3,28 @@
 
 #include "Util.h"
 
+#include <dpp/nlohmann/json.hpp>
 #include <curl/curl.h>
 
 #include <string>
 #include <cstddef>
 #include <vector>
+#include <mutex>
 
 const int k_curlRetryWaitMs = 30000;
 
+/**
+ * osu!API v2 wrapper. Only implements endpoints necessary for this project,
+ * but can be easily extended.
+ */
 class OsuWrapper 
 {
 public:
     OsuWrapper(const std::string& clientID, const std::string& clientSecret, const int apiCooldownMs);
     ~OsuWrapper();
 
-    bool getRankingIDs(Page page, std::vector<UserID>& userIDs, std::size_t numIDs);
-    bool getUser(UserID userID, DosuUser& user);
+    bool getRankings(Page page, nlohmann::json& rankings);
+    bool getUser(UserID userID, nlohmann::json& user);
 
 private:
     void updateToken();
