@@ -41,7 +41,12 @@ void RankingsDatabaseManager::cleanup()
 
     if (m_database->getTotalChanges() > 0)
     {
-        m_database->exec("COMMIT");
+        try
+        {
+            m_database->exec("COMMIT");
+        }
+        catch(const SQLite::Exception& e)
+        {}
     }
 
     m_database.reset();
