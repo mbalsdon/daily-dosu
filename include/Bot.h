@@ -43,6 +43,8 @@ private:
     void onSlashCommand(const dpp::slashcommand_t& event);
     void onButtonClick(const dpp::button_click_t& event);
 
+    void deleteGlobalCommand(std::string cmdName);
+
     void cmdHelp(const dpp::slashcommand_t& event);
     void cmdPing(const dpp::slashcommand_t& event);
     void cmdNewsletter(const dpp::slashcommand_t& event);

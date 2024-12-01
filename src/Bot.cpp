@@ -11,6 +11,7 @@
 #include <filesystem>
 #include <cstddef>
 #include <functional>
+#include <thread>
 
 /**
  * Bot constructor.
@@ -201,6 +202,12 @@ void Bot::onSlashCommand(const dpp::slashcommand_t& event)
     {
         cmdUnsubscribe(event);
     }
+    else
+    {
+        LOG_WARN("Got unknown slash command /", cmdName, "; attempting to remove it...");
+        std::thread(&Bot::deleteGlobalCommand, this, cmdName).detach();
+        event.reply(dpp::message("Command does not exist! If it is still listed in a few minutes, this may be a bug.").set_flags(dpp::m_ephemeral));
+    }
 }
 
 /**
@@ -253,6 +260,31 @@ void Bot::onButtonClick(const dpp::button_click_t& event)
             }
         });
         event.reply();
+    }
+}
+
+/**
+ * WARNING: This function is blocking and should be called in a seperate thread rather than in event handlers.
+ *
+ * Delete global command by name.
+ */
+void Bot::deleteGlobalCommand(std::string cmdName)
+{
+    LOG_DEBUG("Removing stale command ", cmdName, "...");
+    try
+    {
+        auto slashCommands = m_bot.global_commands_get_sync();
+        for (const auto& cmd : slashCommands)
+        {
+            if (cmd.second.name == cmdName)
+            {
+                m_bot.global_command_delete_sync(cmd.first);
+            }
+        }
+    }
+    catch(const std::exception& e)
+    {
+        LOG_ERROR("Caught error while trying to delete command ", cmdName, "; ", e.what());
     }
 }
 
