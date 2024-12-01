@@ -21,7 +21,7 @@ struct SourceLocation
 };
 
 /**
- * TODO: desc
+ * Simple logger class.
  */
 class Logger
 {
@@ -44,7 +44,7 @@ public:
     {
         m_logLevel = intToLevel(level);
     }
-    
+
     void setLogLevel(Level level)
     {
         m_logLevel = level;
@@ -79,7 +79,7 @@ public:
         (ss << ... << std::forward<Args>(args)) << std::endl;
 
         // Send to stdout (thread-safe)
-        std::cout << ss.str();
+        std::cout << ss.str() << std::flush;
     }
 
 private:
