@@ -66,10 +66,10 @@ public:
 
         // Append prefix
         std::stringstream ss;
-        ss << "[" << std::put_time(std::localtime(&time), "%Y-%m-%d %H:%M:%S") << "." << std::setfill('0') << std::setw(3) << nowMs.count() << "] ";
         ss << "[" << levelToString(level) << "] ";
         if (m_logLevel <= Level::DEBUG)
         {
+            ss << "[" << std::put_time(std::localtime(&time), "%Y-%m-%d %H:%M:%S") << "." << std::setfill('0') << std::setw(3) << nowMs.count() << "] ";
             ss << "[" << threadID << "] ";
             ss << "[" << location.file << ":" << location.line << "] ";
             ss << "[" << location.function << "] ";
