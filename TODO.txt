@@ -1,6 +1,4 @@
 - TODO
---- test & release
---- optional gdrive backups
 --- country
 ----- check what get rankings endpoint does with "country" param
 ----- how to format this with new jobs in mind (look thru supported components)
