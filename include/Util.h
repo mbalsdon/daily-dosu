@@ -73,6 +73,9 @@ constexpr std::size_t k_thirdRangeMax = 10000;
 constexpr std::size_t k_numDisplayUsersTop = 15;
 constexpr std::size_t k_numDisplayUsersBottom = 5;
 
+const std::chrono::hours k_minValidScrapeRankingsHour = std::chrono::hours(22);
+const std::chrono::hours k_maxValidScrapeRankingsHour = std::chrono::hours(26);
+
 const std::filesystem::path k_rootDir = std::filesystem::path(__FILE__).parent_path().parent_path();
 const std::filesystem::path k_dosuConfigFilePath = k_rootDir / "dosu_config.json";
 const std::filesystem::path k_dataDir = k_rootDir / "data";
