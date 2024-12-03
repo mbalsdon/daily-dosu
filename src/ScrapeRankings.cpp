@@ -106,7 +106,7 @@ void scrapeRankings(RankingsDatabaseManager& rankingsDbm)
     auto lastWriteTime = rankingsDbm.lastWriteTime();
     auto now = std::filesystem::file_time_type::clock::now();
     std::chrono::hours ageHours = std::chrono::duration_cast<std::chrono::hours>(now - lastWriteTime);
-    if ((ageHours < std::chrono::hours(24)) || (ageHours > std::chrono::hours(25)))
+    if ((ageHours < k_minValidScrapeRankingsHour) || (ageHours > k_maxValidScrapeRankingsHour))
     {
         LOG_INFO("Database is out of sync with current time of running; starting from scratch...");
         rankingsDbm.wipeTables();

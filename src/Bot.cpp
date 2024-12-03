@@ -365,7 +365,7 @@ bool Bot::buildScrapeRankingsEmbeds()
     auto lastWriteTime = m_rankingsDbm.lastWriteTime();
     auto now = std::filesystem::file_time_type::clock::now();
     std::chrono::hours ageHours = std::chrono::duration_cast<std::chrono::hours>(now - lastWriteTime);
-    if ((ageHours > std::chrono::hours(25)) || m_rankingsDbm.isRankingsEmpty())
+    if ((ageHours > k_maxValidScrapeRankingsHour) || m_rankingsDbm.isRankingsEmpty())
     {
         LOG_DEBUG("Data is invalid, leaving scrapeRankings embeds empty...");
         m_bScrapeRankingsEmbedsPopulated = false;
