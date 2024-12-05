@@ -1,7 +1,13 @@
 - TODO
---- country
------ check what get rankings endpoint does with "country" param
------ how to format this with new jobs in mind (look thru supported components)
+--- improve country input
+----- store alpha2, alpha3, and full name; maps to alpha2; match against it in modal
+----- if unrecognized, direct the user to a help command; dms them all countries directly
+----- rmbr to update modal desc
+
+--- other modes support
+--- clean up metadata functions (use iterator or sth)
+--- filter by playstyle ferda?
+--- update to cpp20, update libraries (dpp making valgrind cry)
 
 - MAYBE
 --- new jobs

@@ -36,8 +36,8 @@ public:
     std::vector<UserID> getUserIDsWithNullYesterdayRank();
     void updateYesterdayRanks(std::vector<std::pair<UserID, Rank>>& userYesterdayRanks);
     bool isRankingsEmpty();
-    std::vector<RankImprovement> getTopRankImprovements(int64_t minRank, int64_t maxRank, std::size_t numUsers);
-    std::vector<RankImprovement> getBottomRankImprovements(int64_t minRank, int64_t maxRank, std::size_t numUsers);
+    std::vector<RankImprovement> getTopRankImprovements(std::string countryCode, int64_t minRank, int64_t maxRank, std::size_t numUsers);
+    std::vector<RankImprovement> getBottomRankImprovements(std::string countryCode, int64_t minRank, int64_t maxRank, std::size_t numUsers);
 
 private:
     RankingsDatabaseManager()

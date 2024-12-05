@@ -9,6 +9,7 @@
 #include <cmath>
 #include <cstddef>
 #include <algorithm>
+#include <cstring>
 
 namespace Detail
 {
@@ -93,6 +94,20 @@ std::string toHexString(int i)
     ss << std::hex << i;
     return ss.str();
 }
+
+/**
+ * Convert rank range to dpp color.
+ */
+uint32_t rankRangeToColor(RankRange rankRange)
+{
+    switch (rankRange.m_value)
+    {
+    case RankRange::First: return k_firstRangeColor;
+    case RankRange::Second: return k_secondRangeColor;
+    case RankRange::Third: return k_thirdRangeColor;
+    default: return k_firstRangeColor;
+    }
+}
 } /* namespace Detail*/
 
 /**
@@ -124,9 +139,9 @@ dpp::embed EmbedGenerator::helpEmbed()
 /**
  * Create scrapeRankings embed for given rank range.
  */
-dpp::embed EmbedGenerator::scrapeRankingsEmbed(RankRange rankRange, std::vector<RankImprovement> top, std::vector<RankImprovement> bottom)
+dpp::embed EmbedGenerator::scrapeRankingsEmbed(const std::string countryCode, const RankRange rankRange, std::vector<RankImprovement> top, std::vector<RankImprovement> bottom)
 {
-    LOG_DEBUG("Building scrapeRankings embed for range ", static_cast<int>(rankRange), "...");
+    LOG_DEBUG("Building scrapeRankings embed for range ", rankRange.toString(), "...");
 
     // Add static embed fields
     int utcHour = Detail::localToUtc(DosuConfig::scrapeRankingsRunHour);
@@ -141,63 +156,59 @@ dpp::embed EmbedGenerator::scrapeRankingsEmbed(RankRange rankRange, std::vector<
             .set_text(footerText)
             .set_icon(footerIcon)
         );
-    
+
     // Add range-dependent embed fields
-    std::stringstream description;
-    description << std::fixed << std::setprecision(2);
-    if (rankRange == RankRange::First)
+    embed.add_field("", metadataTag(countryCode, rankRange.toInt()));
+
+    if (!top.empty())
     {
-        embed.set_color(k_firstRangeColor);
-        description << "## :up_arrow: Largest rank increases (#1 - #" << k_firstRangeMax << "):\n";
-        addPlayersToScrapeRankingsDescription(description, top, true);
-        description << "## :down_arrow: Largest rank decreases (#1 - #" << k_firstRangeMax << "):\n";
-        addPlayersToScrapeRankingsDescription(description, bottom, false);
+        embed.set_thumbnail(top.at(0).user.pfpLink);
     }
-    else if (rankRange == RankRange::Second)
+    else if (!bottom.empty())
     {
-        embed.set_color(k_secondRangeColor);
-        description << "## :up_arrow: Largest rank increases (#" << k_firstRangeMax + 1 << " - #" << k_secondRangeMax << "):\n";
-        addPlayersToScrapeRankingsDescription(description, top, true);
-        description << "## :down_arrow: Largest rank decreases (#" << k_firstRangeMax + 1 << " - #" << k_secondRangeMax << "):\n";
-        addPlayersToScrapeRankingsDescription(description, bottom, false);
+        embed.set_thumbnail(bottom.at(0).user.pfpLink);
     }
     else
     {
-        embed.set_color(k_thirdRangeColor);
-        description << "## :up_arrow: Largest rank increases (#" << k_secondRangeMax + 1 << " - #" << k_thirdRangeMax << "):\n";
-        addPlayersToScrapeRankingsDescription(description, top, true);
-        description << "## :down_arrow: Largest rank decreases (#" << k_secondRangeMax + 1 << " - #" << k_thirdRangeMax << "):\n";
-        addPlayersToScrapeRankingsDescription(description, bottom, false);
+        embed.set_thumbnail(k_defaultPfpUrl);
     }
 
+    std::stringstream description;
+    description << std::fixed << std::setprecision(2);
+
+    embed.set_color(Detail::rankRangeToColor(rankRange));
+    description << "## :up_arrow: Largest rank increases (#" << rankRange.toRange().first << " - #" << rankRange.toRange().second << "):\n";
+    addPlayersToScrapeRankingsDescription(description, std::move(top), true);
+    description << "## :down_arrow: Largest rank decreases (#" << rankRange.toRange().first << " - #" << rankRange.toRange().second << "):\n";
+    addPlayersToScrapeRankingsDescription(description, std::move(bottom), false);
+
     embed.set_description(description.str());
-    embed.set_thumbnail(scrapeRankingsThumbnail(top, bottom));
 
     return embed;
 }
 
 /**
- * Create scrapeRankings action row.
+ * Create first scrapeRankings action row.
  */
-dpp::component EmbedGenerator::scrapeRankingsActionRow()
+dpp::component EmbedGenerator::scrapeRankingsActionRow1()
 {
-    LOG_DEBUG("Building scrapeRankings action row...");
+    LOG_DEBUG("Building 1st scrapeRankings action row...");
 
     dpp::component firstRangeButton;
     firstRangeButton.set_type(dpp::cot_button);
-    firstRangeButton.set_label("#1 - #" + std::to_string(k_firstRangeMax));
+    firstRangeButton.set_label("#" + std::to_string(RankRange(0).toRange().first) + " - #" + std::to_string(RankRange(0).toRange().second));
     firstRangeButton.set_style(dpp::cos_primary);
     firstRangeButton.set_id(k_firstRangeButtonID);
 
     dpp::component secondRangeButton;
     secondRangeButton.set_type(dpp::cot_button);
-    secondRangeButton.set_label("#" + std::to_string(k_firstRangeMax + 1) + " - #" + std::to_string(k_secondRangeMax));
+    secondRangeButton.set_label("#" + std::to_string(RankRange(1).toRange().first) + " - #" + std::to_string(RankRange(1).toRange().second));
     secondRangeButton.set_style(dpp::cos_primary);
     secondRangeButton.set_id(k_secondRangeButtonID);
 
     dpp::component thirdRangeButton;
     thirdRangeButton.set_type(dpp::cot_button);
-    thirdRangeButton.set_label("#" + std::to_string(k_secondRangeMax + 1) + " - #" + std::to_string(k_thirdRangeMax));
+    thirdRangeButton.set_label("#" + std::to_string(RankRange(2).toRange().first) + " - #" + std::to_string(RankRange(2).toRange().second));
     thirdRangeButton.set_style(dpp::cos_primary);
     thirdRangeButton.set_id(k_thirdRangeButtonID);
 
@@ -211,9 +222,103 @@ dpp::component EmbedGenerator::scrapeRankingsActionRow()
 }
 
 /**
+ * Create second scrapeRankings action row.
+ */
+dpp::component EmbedGenerator::scrapeRankingsActionRow2()
+{
+    LOG_DEBUG("Building 2nd scrapeRankings action row...");
+
+    dpp::component filterCountryButton;
+    filterCountryButton.set_type(dpp::cot_button);
+    filterCountryButton.set_label("Filter by country");
+    filterCountryButton.set_style(dpp::cos_primary);
+    filterCountryButton.set_id(k_filterCountryButtonID);
+
+    dpp::component clearFiltersButton;
+    clearFiltersButton.set_type(dpp::cot_button);
+    clearFiltersButton.set_label("Clear filters");
+    clearFiltersButton.set_style(dpp::cos_primary);
+    clearFiltersButton.set_id(k_clearFiltersButtonID);
+
+    dpp::component actionRow;
+    actionRow.set_type(dpp::cot_action_row);
+    actionRow.add_component(filterCountryButton);
+    actionRow.add_component(clearFiltersButton);
+
+    return actionRow;
+}
+
+/**
+ * Create scrapeRankings filter-by-country modal.
+ */
+dpp::interaction_modal_response EmbedGenerator::scrapeRankingsFilterCountryModal()
+{
+    LOG_DEBUG("Building scrapeRankings filter-by-country modal...");
+
+    dpp::component textInput;
+    textInput.set_type(dpp::cot_text);
+    textInput.set_label("Enter country code to sort by:");
+    textInput.set_id(k_filterCountryTextInputID);
+    textInput.set_placeholder("");
+    textInput.set_min_length(2);
+    textInput.set_max_length(2);
+    textInput.set_text_style(dpp::text_short);
+
+    dpp::interaction_modal_response modal;
+    modal.set_custom_id(k_filterCountryModalID);
+    modal.set_title("Filter by country");
+    modal.add_component(textInput);
+
+    return modal;
+}
+
+/**
+ * WARNING: Implementation is very coupled with the format of embed metadata.
+ * Also super unsafe for a variety of reasons 🤪
+ *
+ * Glean metadata from message embed.
+ */
+bool EmbedGenerator::parseMetadata(const dpp::message message, EmbedMetadata& metadata)
+{
+    LOG_DEBUG("Parsing metadata from message ", message.id.operator uint64_t());
+
+    if (message.embeds.size() < 1)
+    {
+        return false;
+    }
+
+    if (message.embeds[0].fields.size() < 1)
+    {
+        return false;
+    }
+
+    std::string metadataStr = message.embeds[0].fields[0].value;
+
+    std::string countrySearchStr = "`COUNTRY: ";
+    std::string rangeSearchStr = "`\n`RANGE: ";
+
+    std::size_t rangePos = metadataStr.find(rangeSearchStr);
+    metadata.m_countryCode = metadataStr.substr(strlen(countrySearchStr.c_str()), rangePos - strlen(countrySearchStr.c_str()));
+
+    std::string rangeStr = metadataStr.substr(rangePos + strlen(rangeSearchStr.c_str()), rangePos + strlen(rangeSearchStr.c_str()) - metadataStr.find_last_of('`'));
+    metadata.m_rankRange = RankRange(rangeStr);
+
+    return true;
+}
+
+/**
+ * Create metadata tag.
+ */
+std::string EmbedGenerator::metadataTag(const std::string countryCode, const RankRange rankRange)
+{
+    return "`COUNTRY: " + countryCode + "`\n`RANGE: " + std::to_string(rankRange.toInt()) + "`";
+}
+
+/**
+ * Helper function for scrapeRankingsEmbed.
  * Format and pipe to description based on if these are top/bottom players.
  */
-void EmbedGenerator::addPlayersToScrapeRankingsDescription(std::stringstream& description, std::vector<RankImprovement> players, bool bIsTop)
+void EmbedGenerator::addPlayersToScrapeRankingsDescription(std::stringstream& description, std::vector<RankImprovement> players, const bool bIsTop)
 {
     std::size_t displayUsersMax = (bIsTop ? k_numDisplayUsersTop : k_numDisplayUsersBottom);
 
@@ -249,24 +354,4 @@ void EmbedGenerator::addPlayersToScrapeRankingsDescription(std::stringstream& de
     {
         description << "Looks like nobody " << (bIsTop ? "gained" : "lost") << " ranks today... :shrug:\n";
     }
-}
-
-/**
- * Return pfp link of the first player-to-be-displayed.
- */
-ProfilePicture EmbedGenerator::scrapeRankingsThumbnail(std::vector<RankImprovement> top, std::vector<RankImprovement> bottom)
-{
-    LOG_DEBUG("Figuring out who to put as the scrapeRankings thumbnail...");
-
-    if (!top.empty())
-    {
-        return top.at(0).user.pfpLink;
-    }
-    
-    if (!bottom.empty())
-    {
-        return bottom.at(0).user.pfpLink;
-    }
-
-    return ProfilePicture(k_defaultPfpUrl);
 }

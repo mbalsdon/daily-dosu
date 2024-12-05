@@ -24,9 +24,10 @@ I have only tested on Linux. If you try running on other platforms, let me know 
 2. After cloning the repository, initialize submodules:
     - `git submodule update --init --recursive`
 3. Configure the project:
-    - `mkdir <build folder path> && cd <build folder path> && cmake <daily-dosu path>`
+    - `mkdir <build folder path> && cd <build folder path>`
+    - `cmake <daily-dosu path> -DCMAKE_BUILD_TYPE=Release`
 4. Compile and run the project:
-    - `` make -j`nproc` ``
+    - `` cmake --build . -j`nproc` ``
     - `./daily-dosu`
 
 

@@ -121,7 +121,6 @@ void DailyJob::runJobLoop()
         {
             LOG_ERROR("Unknown error in job ", m_name);
         }
-        
     }
 }
 
