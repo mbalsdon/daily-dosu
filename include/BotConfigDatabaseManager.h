@@ -28,6 +28,7 @@ public:
     std::vector<dpp::snowflake> getChannelIDs();
     void addChannel(dpp::snowflake channelID);
     void removeChannel(dpp::snowflake channelID);
+    bool channelExists(dpp::snowflake channelID);
 
 private:
     BotConfigDatabaseManager()

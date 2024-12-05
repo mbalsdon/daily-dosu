@@ -15,7 +15,7 @@
 #include <atomic>
 
 const std::chrono::seconds k_cmdRateLimitPeriod = std::chrono::seconds(5);
-const std::chrono::seconds k_buttonRateLimitPeriod = std::chrono::seconds(3);
+const std::chrono::seconds k_interactionRateLimitPeriod = std::chrono::seconds(3);
 
 /**
  * DPP wrapper for the Discord bot. All event handling logic (and nothing else) should go here.
@@ -61,6 +61,7 @@ private:
     std::atomic<bool> m_bIsInitialized;
 
     std::unordered_map<dpp::snowflake, std::chrono::steady_clock::time_point> m_latestCommands;
+    std::unordered_map<dpp::snowflake, std::chrono::steady_clock::time_point> m_latestInteractions;
 
     dpp::embed m_helpEmbed;
 

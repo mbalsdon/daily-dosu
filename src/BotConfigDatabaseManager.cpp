@@ -103,6 +103,19 @@ void BotConfigDatabaseManager::removeChannel(dpp::snowflake channelID)
 }
 
 /**
+ * Check if channel exists.
+ */
+bool BotConfigDatabaseManager::channelExists(dpp::snowflake channelID)
+{
+    std::lock_guard<std::mutex> lock(m_dbMtx);
+    LOG_DEBUG("Checking if channel exists with ID ", channelID.operator uint64_t());
+
+    SQLite::Statement query(*m_database, "SELECT COUNT(*) FROM BotConfig WHERE channelID = ?");
+    query.bind(1, static_cast<int64_t>(channelID.operator uint64_t()));
+    return (query.executeStep() && query.getColumn(0).getInt64() > 0);
+}
+
+/**
  * BotConfigDatabaseManager destructor.
  */
 BotConfigDatabaseManager::~BotConfigDatabaseManager()
