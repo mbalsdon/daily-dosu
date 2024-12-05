@@ -197,8 +197,9 @@ bool RankingsDatabaseManager::isRankingsEmpty()
 
 /**
  * Get top users sorted by relative rank improvement.
+ * Entering "GLOBAL" for countryCode means no filter.
  */
-std::vector<RankImprovement> RankingsDatabaseManager::getTopRankImprovements(int64_t minRank, int64_t maxRank, std::size_t numUsers)
+std::vector<RankImprovement> RankingsDatabaseManager::getTopRankImprovements(std::string countryCode, int64_t minRank, int64_t maxRank, std::size_t numUsers)
 {
     std::lock_guard<std::mutex> lock(m_dbMtx);
     LOG_DEBUG("Retrieving top users by rank improvement...");
@@ -226,6 +227,7 @@ std::vector<RankImprovement> RankingsDatabaseManager::getTopRankImprovements(int
             AND currentRank >= ?
             AND currentRank <= ?
             AND yesterdayRank > currentRank
+            AND (countryCode = ? OR ? = 'GLOBAL')
         ORDER BY 
             (CAST(yesterdayRank - currentRank AS FLOAT) / currentRank) DESC
         LIMIT ?
@@ -233,7 +235,9 @@ std::vector<RankImprovement> RankingsDatabaseManager::getTopRankImprovements(int
 
     query.bind(1, minRank);
     query.bind(2, maxRank);
-    query.bind(3, static_cast<int64_t>(numUsers));
+    query.bind(3, countryCode);
+    query.bind(4, countryCode);
+    query.bind(5, static_cast<int64_t>(numUsers));
 
     while (query.executeStep())
     {
@@ -257,8 +261,9 @@ std::vector<RankImprovement> RankingsDatabaseManager::getTopRankImprovements(int
 
 /**
  * Get bottom users sorted by relative rank improvement.
+ * Entering "GLOBAL" for countryCode means no filter.
  */
-std::vector<RankImprovement> RankingsDatabaseManager::getBottomRankImprovements(int64_t minRank, int64_t maxRank, std::size_t numUsers)
+std::vector<RankImprovement> RankingsDatabaseManager::getBottomRankImprovements(std::string countryCode, int64_t minRank, int64_t maxRank, std::size_t numUsers)
 {
     std::lock_guard<std::mutex> lock(m_dbMtx);
     LOG_DEBUG("Retrieving bottom users by rank improvement...");
@@ -285,6 +290,7 @@ std::vector<RankImprovement> RankingsDatabaseManager::getBottomRankImprovements(
             AND currentRank >= ?
             AND currentRank <= ?
             AND yesterdayRank < currentRank
+            AND (countryCode = ? OR ? = 'GLOBAL')
         ORDER BY 
             (CAST(currentRank - yesterdayRank AS FLOAT) / currentRank) DESC
         LIMIT ?
@@ -292,7 +298,9 @@ std::vector<RankImprovement> RankingsDatabaseManager::getBottomRankImprovements(
 
     query.bind(1, minRank);
     query.bind(2, maxRank);
-    query.bind(3, static_cast<int64_t>(numUsers));
+    query.bind(3, countryCode);
+    query.bind(4, countryCode);
+    query.bind(5, static_cast<int64_t>(numUsers));
 
     while (query.executeStep())
     {

@@ -12,6 +12,39 @@
 #include <cstddef>
 #include <functional>
 #include <thread>
+#include <algorithm>
+#include <utility>
+
+namespace Detail
+{
+RankRange buttonIDToRankRange(std::string buttonID)
+{
+    if (buttonID == k_firstRangeButtonID)
+    {
+        return RankRange(0);
+    }
+    else if (buttonID == k_secondRangeButtonID)
+    {
+        return RankRange(1);
+    }
+    else
+    {
+        return RankRange(2);
+    }
+}
+bool isValidCountryCode(std::string countryCode) // const&?
+{
+    for (const auto& code : ISO3166_Alpha2::codes)
+    {
+        if (code == countryCode)
+        {
+            return true;
+        }
+    }
+
+    return false;
+}
+} /* namespace Detail */
 
 /**
  * Bot constructor.
@@ -24,8 +57,7 @@ Bot::Bot(const std::string& botToken, RankingsDatabaseManager& rankingsDbm, BotC
     , m_bIsInitialized(false)
 {
     LOG_DEBUG("Constructing Bot...");
-    buildHelpEmbeds();
-    buildScrapeRankingsEmbeds();
+    buildStaticComponents();
 }
 
 /**
@@ -54,6 +86,7 @@ void Bot::start()
     m_bot.on_ready(std::bind(&Bot::onReady, this, std::placeholders::_1));
     m_bot.on_slashcommand(std::bind(&Bot::onSlashCommand, this, std::placeholders::_1));
     m_bot.on_button_click(std::bind(&Bot::onButtonClick, this, std::placeholders::_1));
+    m_bot.on_form_submit(std::bind(&Bot::onFormSubmit, this, std::placeholders::_1));
 
     m_bot.start(dpp::st_return);
 
@@ -84,33 +117,26 @@ void Bot::stop()
 }
 
 /**
- * Reads user data from disk, building and sending associated embeds to all subscribed channels.
+ * Build and send newsletter to all subscribed channels.
  */
 void Bot::scrapeRankingsCallback()
 {
     LOG_DEBUG("Executing callback for scrape job...");
 
-    if (!buildScrapeRankingsEmbeds())
+    // Build message
+    dpp::message message;
+    if (!buildNewsletter(k_global, RankRange(0), message))
     {
-        LOG_ERROR("Callback was triggered, but failed to build embeds!");
+        LOG_ERROR("Callback was triggered, but failed to build newsletter!");
         return;
     }
 
-    dpp::message message;
-    message.add_embed(m_scrapeRankingsFirstRangeEmbed);
-    message.add_component(m_scrapeRankingsActionRow);
-
-    // Send message to subscriber list
+    // Send to channels
     for (const auto& channelID : m_botConfigDbm.getChannelIDs())
     {
         message.channel_id = channelID;
-        m_bot.message_create(message, [channelID](const dpp::confirmation_callback_t& callback)
-        {
-            if (callback.is_error())
-            {
-                LOG_WARN("Failed to send message to channel ", channelID, "; ", callback.get_error().message);
-            }
-        });
+        std::string onCompletionID = std::string("send-to-channel-").append(std::to_string(channelID.operator uint64_t()));
+        m_bot.message_create(message, std::bind(&Bot::onCompletion, this, std::placeholders::_1, onCompletionID));
     }
 }
 
@@ -239,44 +265,133 @@ void Bot::onButtonClick(const dpp::button_click_t& event)
         (buttonID == k_thirdRangeButtonID))
     {
         dpp::message message = event.command.msg;
-        message.embeds.clear();
-        if (buttonID == k_firstRangeButtonID)
+        EmbedMetadata embedMetadata;
+        if (!m_embedGenerator.parseMetadata(message, embedMetadata))
         {
-            message.embeds.push_back(m_scrapeRankingsFirstRangeEmbed);
-        }
-        else if (buttonID == k_secondRangeButtonID)
-        {
-            message.embeds.push_back(m_scrapeRankingsSecondRangeEmbed);
-        }
-        else
-        {
-            message.embeds.push_back(m_scrapeRankingsThirdRangeEmbed);
+            LOG_ERROR("Failed to parse metadata for current embed!");
+            event.reply(dpp::message("Failed to parse metadata! This is a bug...").set_flags(dpp::m_ephemeral));
+            return;
         }
 
-        m_bot.message_edit(message, [buttonID, event](const dpp::confirmation_callback_t& callback)
+        if (!buildNewsletter(embedMetadata.m_countryCode, Detail::buttonIDToRankRange(buttonID), message))
         {
-            if (callback.is_error())
-            {
-                LOG_WARN("Failed to edit message after button ", buttonID, " was pressed; ", callback.get_error().message);
-                auto error = callback.get_error();
-                if (error.code == 50001)
-                {
-                    event.reply(dpp::message("Button failed! Bot is missing channel access...").set_flags(dpp::m_ephemeral));
-                }
-                else if (error.code == 50013)
-                {
-                    event.reply(dpp::message("Button failed! Bot is missing permissions...").set_flags(dpp::m_ephemeral));
-                }
-                else
-                {
-                    event.reply(dpp::message("Button failed! Got error '" + callback.get_error().message + "'... this is probably a bug.").set_flags(dpp::m_ephemeral));
-                }
-            }
-            else
-            {
-                event.reply();
-            }
-        });
+            LOG_ERROR(buttonID, " was pressed, but failed to build newsletter!");
+            event.reply(dpp::message("Failed to build new embed! This is a bug...").set_flags(dpp::m_ephemeral));
+            return;
+        }
+
+        m_bot.message_edit(message, std::bind(&Bot::onCompletionReply, this, std::placeholders::_1, buttonID, event));
+    }
+    else if (buttonID == k_filterCountryButtonID)
+    {
+        dpp::interaction_modal_response modal = m_embedGenerator.scrapeRankingsFilterCountryModal();
+        event.dialog(modal, std::bind(&Bot::onCompletion, this, std::placeholders::_1, buttonID));
+    }
+    else if (buttonID == k_clearFiltersButtonID)
+    {
+        dpp::message message = event.command.msg;
+
+        EmbedMetadata embedMetadata;
+        if (!m_embedGenerator.parseMetadata(message, embedMetadata))
+        {
+            LOG_ERROR("Failed to parse metadata for current embed!");
+            event.reply(dpp::message("Failed to parse metadata! This is a bug...").set_flags(dpp::m_ephemeral));
+            return;
+        }
+
+        if (!buildNewsletter(k_global, embedMetadata.m_rankRange, message))
+        {
+            LOG_ERROR(k_clearFiltersButtonID, " was pressed, but failed to build newsletter!");
+            event.reply(dpp::message("Failed to build new embed! This is a bug...").set_flags(dpp::m_ephemeral));
+            return;
+        }
+
+        m_bot.message_edit(message, std::bind(&Bot::onCompletionReply, this, std::placeholders::_1, buttonID, event));
+    }
+}
+
+/**
+ * Handle form submission event.
+ */
+void Bot::onFormSubmit(const dpp::form_submit_t& event)
+{
+    auto formID = event.custom_id;
+    LOG_DEBUG("Processing form submission for modal ", formID);
+
+    // Route form submission
+    if (formID == k_filterCountryModalID)
+    {
+        std::string countryCode = std::get<std::string>(event.components[0].components[0].value);
+        std::transform(countryCode.begin(), countryCode.end(), countryCode.begin(), ::toupper);
+        LOG_DEBUG("Processing request to filter country by ", countryCode);
+
+        if (!Detail::isValidCountryCode(countryCode))
+        {
+            event.reply(dpp::message(countryCode + " is not a valid country code!").set_flags(dpp::m_ephemeral));
+            return;
+        }
+
+        dpp::message message = event.command.msg;
+
+        // FIXME: currMessageCountryCode is unused
+        EmbedMetadata embedMetadata;
+        if (!m_embedGenerator.parseMetadata(message, embedMetadata))
+        {
+            LOG_ERROR("Failed to parse metadata for current embed!");
+            event.reply(dpp::message("Failed to parse metadata! This is a bug...").set_flags(dpp::m_ephemeral));
+            return;
+        }
+
+        if (!buildNewsletter(countryCode, embedMetadata.m_rankRange, message))
+        {
+            LOG_ERROR(k_filterCountryModalID, " was submitted with countryCode=", countryCode, ", but failed to build newsletter!");
+            event.reply(dpp::message("Failed to build new embed! This is a bug...").set_flags(dpp::m_ephemeral));
+            return;
+        }
+
+        m_bot.message_edit(message, std::bind(&Bot::onCompletionReply, this, std::placeholders::_1, formID, event));
+    }
+}
+
+/**
+ * Generic completion callback handler.
+ */
+void Bot::onCompletion(const dpp::confirmation_callback_t& callback, const std::string customID)
+{
+    if (callback.is_error())
+    {
+        auto error = callback.get_error();
+        LOG_WARN("Failed to handle interaction for ", customID, "; ", error.message);
+    }
+}
+
+/**
+ * Generic completion callback handler. Replies to event.
+ */
+void Bot::onCompletionReply(const dpp::confirmation_callback_t& callback, const std::string customID, const dpp::interaction_create_t event)
+{
+    if (callback.is_error())
+    {
+        auto error = callback.get_error();
+        LOG_WARN("Failed to handle interaction for ", customID, "; ", error.message);
+
+        switch (error.code)
+        {
+        case 50001:
+            event.reply(dpp::message("Bot is missing channel access!").set_flags(dpp::m_ephemeral));
+            return;
+        case 50013:
+            event.reply(dpp::message("Bot is missing permissions!").set_flags(dpp::m_ephemeral));
+            return;
+        default:
+            event.reply(dpp::message("Button failed! Got error '" + error.message + "'... This is possibly a bug.").set_flags(dpp::m_ephemeral));
+            return;
+        }
+    }
+    else // not error
+    {
+        event.reply();
+        return;
     }
 }
 
@@ -328,15 +443,13 @@ void Bot::cmdPing(const dpp::slashcommand_t& event)
  */
 void Bot::cmdNewsletter(const dpp::slashcommand_t& event)
 {
-    if (!m_bScrapeRankingsEmbedsPopulated)
+    dpp::message message;
+    if (!buildNewsletter(k_global, RankRange(0), message))
     {
+        LOG_WARN("Got command, but failed to build newsletter!");
         event.reply(dpp::message("Couldn't find newsletter! If you still see this message tomorrow, it might be a bug.").set_flags(dpp::m_ephemeral));
         return;
     }
-
-    dpp::message message;
-    message.add_embed(m_scrapeRankingsFirstRangeEmbed);
-    message.add_component(m_scrapeRankingsActionRow);
 
     event.reply(message);
 }
@@ -385,50 +498,55 @@ void Bot::cmdUnsubscribe(const dpp::slashcommand_t& event)
 }
 
 /**
- * Construct help embeds and store in memory.
+ * Build and store unchanging components to memory.
  */
-void Bot::buildHelpEmbeds()
+void Bot::buildStaticComponents()
 {
-    LOG_DEBUG("Populating help embeds...");
+    LOG_DEBUG("Building static components...");
+
     m_helpEmbed = m_embedGenerator.helpEmbed();
+    m_scrapeRankingsActionRow1 = m_embedGenerator.scrapeRankingsActionRow1();
+    m_scrapeRankingsActionRow2 = m_embedGenerator.scrapeRankingsActionRow2();
+    /* FUTURE: The filter-by-country modal is static, but DPP doesn't seem to handle interaction_modal_response like other
+    components/embeds/etc. If we store it here it gets double-freed when the program exits and I'm too lazy to figure out why.
+    Check if this is stil the case when library is updated. */
 }
 
 /**
- * Construct scrapeRankings embeds and store in memory if associated data is valid.
- * Return true if data is valid, false otherwise.
+ * Build newsletter. Returns true if data was valid, false otherwise.
  */
-bool Bot::buildScrapeRankingsEmbeds()
+bool Bot::buildNewsletter(const std::string countryCode, const RankRange rankRange, dpp::message& message)
 {
-    LOG_DEBUG("Populating scrapeRankings embeds...");
+    LOG_DEBUG("Building newsletter for countryCode=", countryCode, ", rankRange=", rankRange.toString(), "...");
+
     auto lastWriteTime = m_rankingsDbm.lastWriteTime();
     auto now = std::filesystem::file_time_type::clock::now();
     std::chrono::hours ageHours = std::chrono::duration_cast<std::chrono::hours>(now - lastWriteTime);
-    if ((ageHours > k_maxValidScrapeRankingsHour) || m_rankingsDbm.isRankingsEmpty())
+    if (ageHours > k_maxValidScrapeRankingsHour)
     {
-        LOG_DEBUG("Data is invalid, leaving scrapeRankings embeds empty...");
-        m_bScrapeRankingsEmbedsPopulated = false;
-    }
-    else
-    {
-        LOG_DEBUG("Data is valid, populating scrapeRankings embeds..");
-        std::size_t numDisplayUsers = k_numDisplayUsersTop + k_numDisplayUsersBottom;
-
-        std::vector<RankImprovement> firstRangeTop = m_rankingsDbm.getTopRankImprovements(1, k_firstRangeMax, numDisplayUsers);
-        std::vector<RankImprovement> firstRangeBottom = m_rankingsDbm.getBottomRankImprovements(1, k_firstRangeMax, numDisplayUsers);
-        m_scrapeRankingsFirstRangeEmbed = m_embedGenerator.scrapeRankingsEmbed(RankRange::First, firstRangeTop, firstRangeBottom);
-
-        std::vector<RankImprovement> secondRangeTop = m_rankingsDbm.getTopRankImprovements(k_firstRangeMax + 1, k_secondRangeMax, numDisplayUsers);
-        std::vector<RankImprovement> secondRangeBottom = m_rankingsDbm.getBottomRankImprovements(k_firstRangeMax + 1, k_secondRangeMax, numDisplayUsers);
-        m_scrapeRankingsSecondRangeEmbed = m_embedGenerator.scrapeRankingsEmbed(RankRange::Second, secondRangeTop, secondRangeBottom);
-
-        std::vector<RankImprovement> thirdRangeTop = m_rankingsDbm.getTopRankImprovements(k_secondRangeMax + 1, k_thirdRangeMax, numDisplayUsers);
-        std::vector<RankImprovement> thirdRangeBottom = m_rankingsDbm.getBottomRankImprovements(k_secondRangeMax + 1, k_thirdRangeMax, numDisplayUsers);
-        m_scrapeRankingsThirdRangeEmbed = m_embedGenerator.scrapeRankingsEmbed(RankRange::Third, thirdRangeTop, thirdRangeBottom);
-
-        m_scrapeRankingsActionRow = m_embedGenerator.scrapeRankingsActionRow();
-
-        m_bScrapeRankingsEmbedsPopulated = true;
+        LOG_WARN("Data is invalid - ageHours=", ageHours.count(), " > ", k_maxValidScrapeRankingsHour.count());
+        return false;
     }
 
-    return m_bScrapeRankingsEmbedsPopulated;
+    if (m_rankingsDbm.isRankingsEmpty())
+    {
+        LOG_WARN("Data is invalid - rankings database is empty!");
+        return false;
+    }
+
+    LOG_DEBUG("Data is valid - building newsletter...");
+
+    auto range = rankRange.toRange();
+    std::vector<RankImprovement> rangeTop = m_rankingsDbm.getTopRankImprovements(countryCode, range.first, range.second, k_numDisplayUsers);
+    std::vector<RankImprovement> rangeBottom = m_rankingsDbm.getBottomRankImprovements(countryCode, range.first, range.second, k_numDisplayUsers);
+    dpp::embed newsletterEmbed = m_embedGenerator.scrapeRankingsEmbed(countryCode, std::move(rankRange), std::move(rangeTop), rangeBottom);
+
+    message.embeds.clear();
+    message.components.clear();
+
+    message.add_embed(newsletterEmbed);
+    message.add_component(m_scrapeRankingsActionRow1);
+    message.add_component(m_scrapeRankingsActionRow2);
+
+    return true;
 }

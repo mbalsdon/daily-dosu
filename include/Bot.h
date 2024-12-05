@@ -42,6 +42,10 @@ private:
     void onReady(const dpp::ready_t& event);
     void onSlashCommand(const dpp::slashcommand_t& event);
     void onButtonClick(const dpp::button_click_t& event);
+    void onFormSubmit(const dpp::form_submit_t& event);
+
+    void onCompletion(const dpp::confirmation_callback_t& callback, const std::string customID);
+    void onCompletionReply(const dpp::confirmation_callback_t& callback, const std::string customID, const dpp::interaction_create_t event);
 
     void deleteGlobalCommand(std::string cmdName);
 
@@ -51,8 +55,8 @@ private:
     void cmdSubscribe(const dpp::slashcommand_t& event);
     void cmdUnsubscribe(const dpp::slashcommand_t& event);
 
-    void buildHelpEmbeds();
-    bool buildScrapeRankingsEmbeds();
+    void buildStaticComponents();
+    bool buildNewsletter(const std::string countryCode, const RankRange rankRange, dpp::message& message);
 
     dpp::cluster m_bot;
     RankingsDatabaseManager& m_rankingsDbm;
@@ -64,12 +68,8 @@ private:
     std::unordered_map<dpp::snowflake, std::chrono::steady_clock::time_point> m_latestInteractions;
 
     dpp::embed m_helpEmbed;
-
-    dpp::embed m_scrapeRankingsFirstRangeEmbed;
-    dpp::embed m_scrapeRankingsSecondRangeEmbed;
-    dpp::embed m_scrapeRankingsThirdRangeEmbed;
-    dpp::component m_scrapeRankingsActionRow;
-    bool m_bScrapeRankingsEmbedsPopulated;
+    dpp::component m_scrapeRankingsActionRow1;
+    dpp::component m_scrapeRankingsActionRow2;
 };
 
 #endif /* __BOT_H__ */

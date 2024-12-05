@@ -202,7 +202,6 @@ void scrapeRankings(RankingsDatabaseManager& rankingsDbm)
             endIdx += numLeftoverCalls;
         }
 
-        // FIXME: move chungus lambda to a function
         // Fire thread (each populates the vector with its portion)
         getUserThreads.emplace_back(
             Detail::processUsers,

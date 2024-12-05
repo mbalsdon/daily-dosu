@@ -8,6 +8,7 @@
 #include <string>
 #include <vector>
 #include <sstream>
+#include <string>
 
 const std::string k_twemojiClockPrefix = "https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f55";
 const std::string k_twemojiClockSuffix = ".png";
@@ -29,13 +30,16 @@ public:
     ~EmbedGenerator() = default;
 
     dpp::embed helpEmbed();
-    dpp::embed scrapeRankingsEmbed(RankRange rankRange, std::vector<RankImprovement> top, std::vector<RankImprovement> bottom);
+    dpp::embed scrapeRankingsEmbed(const std::string countryCode, const RankRange rankRange, std::vector<RankImprovement> top, std::vector<RankImprovement> bottom);
 
-    dpp::component scrapeRankingsActionRow();
+    dpp::component scrapeRankingsActionRow1();
+    dpp::component scrapeRankingsActionRow2();
+    dpp::interaction_modal_response scrapeRankingsFilterCountryModal();
+    bool parseMetadata(const dpp::message message, EmbedMetadata& metadata);
 
 private:
-    void addPlayersToScrapeRankingsDescription(std::stringstream& description, std::vector<RankImprovement> players, bool bIsTop);
-    ProfilePicture scrapeRankingsThumbnail(std::vector<RankImprovement> top, std::vector<RankImprovement> bottom);
+    std::string metadataTag(const std::string countryCode, const RankRange rankRange);
+    void addPlayersToScrapeRankingsDescription(std::stringstream& description, std::vector<RankImprovement> players, const bool bIsTop);
 };
 
 #endif /* __EMBED_GENERATOR_H__ */
