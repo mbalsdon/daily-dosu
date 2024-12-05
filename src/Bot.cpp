@@ -221,17 +221,17 @@ void Bot::onButtonClick(const dpp::button_click_t& event)
     // Verify user is under ratelimit
     auto now = std::chrono::steady_clock::now();
     auto userID = event.command.usr.id;
-    if (m_latestCommands.count(userID))
+    if (m_latestInteractions.count(userID))
     {
-        auto lastUsed = m_latestCommands[userID];
-        if (now - lastUsed < k_buttonRateLimitPeriod)
+        auto lastUsed = m_latestInteractions[userID];
+        if (now - lastUsed < k_interactionRateLimitPeriod)
         {
             LOG_DEBUG("Buttonpress from user ", userID.operator uint64_t(), " was blocked due to ratelimit");
             event.reply(dpp::message("You are pressing buttons too quickly! Please wait a few seconds...").set_flags(dpp::m_ephemeral));
             return;
         }
     }
-    m_latestCommands[userID] = now;
+    m_latestInteractions[userID] = now;
 
     // Route buttonpress
     if ((buttonID == k_firstRangeButtonID) ||
@@ -252,14 +252,31 @@ void Bot::onButtonClick(const dpp::button_click_t& event)
         {
             message.embeds.push_back(m_scrapeRankingsThirdRangeEmbed);
         }
-        m_bot.message_edit(message, [buttonID](const dpp::confirmation_callback_t& callback)
+
+        m_bot.message_edit(message, [buttonID, event](const dpp::confirmation_callback_t& callback)
         {
             if (callback.is_error())
             {
                 LOG_WARN("Failed to edit message after button ", buttonID, " was pressed; ", callback.get_error().message);
+                auto error = callback.get_error();
+                if (error.code == 50001)
+                {
+                    event.reply(dpp::message("Button failed! Bot is missing channel access...").set_flags(dpp::m_ephemeral));
+                }
+                else if (error.code == 50013)
+                {
+                    event.reply(dpp::message("Button failed! Bot is missing permissions...").set_flags(dpp::m_ephemeral));
+                }
+                else
+                {
+                    event.reply(dpp::message("Button failed! Got error '" + callback.get_error().message + "'... this is probably a bug.").set_flags(dpp::m_ephemeral));
+                }
+            }
+            else
+            {
+                event.reply();
             }
         });
-        event.reply();
     }
 }
 
@@ -330,9 +347,23 @@ void Bot::cmdNewsletter(const dpp::slashcommand_t& event)
  */
 void Bot::cmdSubscribe(const dpp::slashcommand_t& event)
 {
+    dpp::permission permissions = event.command.app_permissions;
+    if (!permissions.has(dpp::p_send_messages))
+    {
+        event.reply(dpp::message("Cannot subscribe! Bot lacks permissions to send messages in this channel...").set_flags(dpp::m_ephemeral));
+        return;
+    }
+
     dpp::snowflake channelID = event.command.channel_id;
-    m_botConfigDbm.addChannel(channelID);
-    event.reply("Daily messages have been enabled for this channel.");
+    if (!m_botConfigDbm.channelExists(channelID))
+    {
+        m_botConfigDbm.addChannel(channelID);
+        event.reply("Daily messages have been enabled for this channel.");
+    }
+    else
+    {
+        event.reply("Daily messages are already enabled for this channel!");
+    }
 }
 
 /**
@@ -342,8 +373,15 @@ void Bot::cmdSubscribe(const dpp::slashcommand_t& event)
 void Bot::cmdUnsubscribe(const dpp::slashcommand_t& event)
 {
     dpp::snowflake channelID = event.command.channel_id;
-    m_botConfigDbm.removeChannel(channelID);
-    event.reply("Daily messages have been disabled for this channel.");
+    if (m_botConfigDbm.channelExists(channelID))
+    {
+        event.reply("Daily messages have been disabled for this channel.");
+        m_botConfigDbm.removeChannel(channelID);
+    }
+    else
+    {
+        event.reply("Daily messages are already disabled for this channel!");
+    }
 }
 
 /**
