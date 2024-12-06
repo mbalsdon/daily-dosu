@@ -32,18 +32,6 @@ RankRange buttonIDToRankRange(std::string buttonID)
         return RankRange(2);
     }
 }
-bool isValidCountryCode(std::string countryCode) // const&?
-{
-    for (const auto& code : ISO3166_Alpha2::codes)
-    {
-        if (code == countryCode)
-        {
-            return true;
-        }
-    }
-
-    return false;
-}
 } /* namespace Detail */
 
 /**
@@ -321,19 +309,21 @@ void Bot::onFormSubmit(const dpp::form_submit_t& event)
     // Route form submission
     if (formID == k_filterCountryModalID)
     {
-        std::string countryCode = std::get<std::string>(event.components[0].components[0].value);
-        std::transform(countryCode.begin(), countryCode.end(), countryCode.begin(), ::toupper);
-        LOG_DEBUG("Processing request to filter country by ", countryCode);
+        std::string countryInput = std::get<std::string>(event.components[0].components[0].value);
+        LOG_DEBUG("Processing request to filter country by ", countryInput);
 
-        if (!Detail::isValidCountryCode(countryCode))
+        std::string countryInputUpper = countryInput;
+        std::transform(countryInputUpper.begin(), countryInputUpper.end(), countryInputUpper.begin(), ::toupper);
+
+        std::string countryCode = std::string(ISO3166Alpha2Converter::toAlpha2(countryInputUpper));
+        if (countryCode.empty())
         {
-            event.reply(dpp::message(countryCode + " is not a valid country code!").set_flags(dpp::m_ephemeral));
+            event.reply(dpp::message(countryInput + " is not a valid country!").set_flags(dpp::m_ephemeral));
             return;
         }
 
         dpp::message message = event.command.msg;
 
-        // FIXME: currMessageCountryCode is unused
         EmbedMetadata embedMetadata;
         if (!m_embedGenerator.parseMetadata(message, embedMetadata))
         {
