@@ -257,11 +257,10 @@ dpp::interaction_modal_response EmbedGenerator::scrapeRankingsFilterCountryModal
 
     dpp::component textInput;
     textInput.set_type(dpp::cot_text);
-    textInput.set_label("Enter country code to sort by:");
+    textInput.set_label("Enter country to sort by:");
     textInput.set_id(k_filterCountryTextInputID);
-    textInput.set_placeholder("");
+    textInput.set_placeholder("e.g. KR / KOR / South Korea");
     textInput.set_min_length(2);
-    textInput.set_max_length(2);
     textInput.set_text_style(dpp::text_short);
 
     dpp::interaction_modal_response modal;
