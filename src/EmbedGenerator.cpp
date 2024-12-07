@@ -11,7 +11,7 @@
 #include <algorithm>
 #include <cstring>
 
-namespace Detail
+namespace
 {
 /**
  * Convert given hour from system timezone to UTC.
@@ -61,7 +61,7 @@ std::string toHourString(int hour)
     {
         ret += "0";
     }
-    
+
     ret += std::to_string(hour) + ":00";
     return ret;
 }
@@ -100,7 +100,7 @@ std::string toHexString(int i)
  */
 uint32_t rankRangeToColor(RankRange rankRange)
 {
-    switch (rankRange.m_value)
+    switch (rankRange.getValue())
     {
     case RankRange::First: return k_firstRangeColor;
     case RankRange::Second: return k_secondRangeColor;
@@ -108,7 +108,7 @@ uint32_t rankRangeToColor(RankRange rankRange)
     default: return k_firstRangeColor;
     }
 }
-} /* namespace Detail*/
+} /* namespace */
 
 /**
  * Create help embed.
@@ -139,15 +139,15 @@ dpp::embed EmbedGenerator::helpEmbed()
 /**
  * Create scrapeRankings embed for given rank range.
  */
-dpp::embed EmbedGenerator::scrapeRankingsEmbed(const std::string countryCode, const RankRange rankRange, std::vector<RankImprovement> top, std::vector<RankImprovement> bottom)
+dpp::embed EmbedGenerator::scrapeRankingsEmbed(const std::string countryCode, const RankRange rankRange, const Gamemode mode, std::vector<RankImprovement> top, std::vector<RankImprovement> bottom)
 {
-    LOG_DEBUG("Building scrapeRankings embed for range ", rankRange.toString(), "...");
+    LOG_DEBUG("Building scrapeRankings embed for range ", rankRange.toString(), " and mode ", mode.toString(), "...");
 
     // Add static embed fields
-    int utcHour = Detail::localToUtc(DosuConfig::scrapeRankingsRunHour);
-    std::string footerText = "Runs every day at " + Detail::toHourString(utcHour) + "UTC";
-    std::string footerIcon = k_twemojiClockPrefix + Detail::toHexString(Detail::convertTo12Hour(utcHour) - 1) + k_twemojiClockSuffix;
-    
+    int utcHour = localToUtc(DosuConfig::scrapeRankingsRunHour);
+    std::string footerText = "Runs every day at " + toHourString(utcHour) + "UTC";
+    std::string footerIcon = k_twemojiClockPrefix + toHexString(convertTo12Hour(utcHour) - 1) + k_twemojiClockSuffix;
+
     dpp::embed embed = dpp::embed()
         .set_author("Here's your daily dose of osu!", "https://github.com/mbalsdon/daily-dosu", k_iconImgUrl) // zesty ahh bot
         .set_timestamp(time(0))
@@ -158,7 +158,7 @@ dpp::embed EmbedGenerator::scrapeRankingsEmbed(const std::string countryCode, co
         );
 
     // Add range-dependent embed fields
-    embed.add_field("", metadataTag(countryCode, rankRange.toInt()));
+    embed.add_field("", metadataTag(countryCode, rankRange, mode));
 
     if (!top.empty())
     {
@@ -176,11 +176,11 @@ dpp::embed EmbedGenerator::scrapeRankingsEmbed(const std::string countryCode, co
     std::stringstream description;
     description << std::fixed << std::setprecision(2);
 
-    embed.set_color(Detail::rankRangeToColor(rankRange));
+    embed.set_color(rankRangeToColor(rankRange));
     description << "## :up_arrow: Largest rank increases (#" << rankRange.toRange().first << " - #" << rankRange.toRange().second << "):\n";
-    addPlayersToScrapeRankingsDescription(description, std::move(top), true);
+    addPlayersToScrapeRankingsDescription(description, std::move(top), true, mode);
     description << "## :down_arrow: Largest rank decreases (#" << rankRange.toRange().first << " - #" << rankRange.toRange().second << "):\n";
-    addPlayersToScrapeRankingsDescription(description, std::move(bottom), false);
+    addPlayersToScrapeRankingsDescription(description, std::move(bottom), false, mode);
 
     embed.set_description(description.str());
 
@@ -234,15 +234,22 @@ dpp::component EmbedGenerator::scrapeRankingsActionRow2()
     filterCountryButton.set_style(dpp::cos_primary);
     filterCountryButton.set_id(k_filterCountryButtonID);
 
+    dpp::component selectModeButton;
+    selectModeButton.set_type(dpp::cot_button);
+    selectModeButton.set_label("Select gamemode");
+    selectModeButton.set_style(dpp::cos_primary);
+    selectModeButton.set_id(k_selectModeButtonID);
+
     dpp::component clearFiltersButton;
     clearFiltersButton.set_type(dpp::cot_button);
-    clearFiltersButton.set_label("Clear filters");
+    clearFiltersButton.set_label("Reset all");
     clearFiltersButton.set_style(dpp::cos_primary);
-    clearFiltersButton.set_id(k_clearFiltersButtonID);
+    clearFiltersButton.set_id(k_resetAllButtonID);
 
     dpp::component actionRow;
     actionRow.set_type(dpp::cot_action_row);
     actionRow.add_component(filterCountryButton);
+    actionRow.add_component(selectModeButton);
     actionRow.add_component(clearFiltersButton);
 
     return actionRow;
@@ -257,15 +264,36 @@ dpp::interaction_modal_response EmbedGenerator::scrapeRankingsFilterCountryModal
 
     dpp::component textInput;
     textInput.set_type(dpp::cot_text);
-    textInput.set_label("Enter country to sort by:");
+    textInput.set_label("Enter country to filter by:");
     textInput.set_id(k_filterCountryTextInputID);
     textInput.set_placeholder("e.g. KR / KOR / South Korea");
-    textInput.set_min_length(2);
     textInput.set_text_style(dpp::text_short);
 
     dpp::interaction_modal_response modal;
     modal.set_custom_id(k_filterCountryModalID);
     modal.set_title("Filter by country");
+    modal.add_component(textInput);
+
+    return modal;
+}
+
+/**
+ * Create scrapeRankings filter-by-mode modal.
+ */
+dpp::interaction_modal_response EmbedGenerator::scrapeRankingsFilterModeModal()
+{
+    LOG_DEBUG("Building scrapeRankings filter-by-mode modal...");
+
+    dpp::component textInput;
+    textInput.set_type(dpp::cot_text);
+    textInput.set_label("Select gamemode to view:");
+    textInput.set_id(k_selectModeTextInputID);
+    textInput.set_placeholder("osu / taiko / catch / mania");
+    textInput.set_text_style(dpp::text_short);
+
+    dpp::interaction_modal_response modal;
+    modal.set_custom_id(k_selectModeModalID);
+    modal.set_title("Select gamemode");
     modal.add_component(textInput);
 
     return modal;
@@ -295,12 +323,18 @@ bool EmbedGenerator::parseMetadata(const dpp::message message, EmbedMetadata& me
 
     std::string countrySearchStr = "`COUNTRY: ";
     std::string rangeSearchStr = "`\n`RANGE: ";
+    std::string modeSearchStr = "`\n`GAMEMODE: ";
 
     std::size_t rangePos = metadataStr.find(rangeSearchStr);
-    metadata.m_countryCode = metadataStr.substr(strlen(countrySearchStr.c_str()), rangePos - strlen(countrySearchStr.c_str()));
+    std::size_t modePos = metadataStr.find(modeSearchStr);
 
-    std::string rangeStr = metadataStr.substr(rangePos + strlen(rangeSearchStr.c_str()), rangePos + strlen(rangeSearchStr.c_str()) - metadataStr.find_last_of('`'));
-    metadata.m_rankRange = RankRange(rangeStr);
+    std::string countryStr = metadataStr.substr(strlen(countrySearchStr.c_str()), rangePos - strlen(countrySearchStr.c_str()));
+    std::string rangeStr = metadataStr.substr(rangePos + strlen(rangeSearchStr.c_str()), 1); // Hardcoded to 1-digit enum...
+    std::string modeStr = metadataStr.substr(modePos + strlen(modeSearchStr.c_str()), metadataStr.find_last_of('`') - modePos - strlen(modeSearchStr.c_str()));
+
+    metadata.m_countryCode = countryStr;
+    metadata.m_rankRange = RankRange(std::stoi(rangeStr) - 1);
+    Gamemode::fromString(modeStr, metadata.m_gamemode);
 
     return true;
 }
@@ -308,16 +342,18 @@ bool EmbedGenerator::parseMetadata(const dpp::message message, EmbedMetadata& me
 /**
  * Create metadata tag.
  */
-std::string EmbedGenerator::metadataTag(const std::string countryCode, const RankRange rankRange)
+std::string EmbedGenerator::metadataTag(const std::string countryCode, const RankRange rankRange, const Gamemode mode)
 {
-    return "`COUNTRY: " + countryCode + "`\n`RANGE: " + std::to_string(rankRange.toInt()) + "`";
+    std::string modeUpper = mode.toString();
+    std::transform(modeUpper.begin(), modeUpper.end(), modeUpper.begin(), ::toupper);
+    return "`COUNTRY: " + countryCode + "`\n`RANGE: " + std::to_string(rankRange.toInt() + 1) + "`\n`GAMEMODE: " + modeUpper + "`";
 }
 
 /**
  * Helper function for scrapeRankingsEmbed.
  * Format and pipe to description based on if these are top/bottom players.
  */
-void EmbedGenerator::addPlayersToScrapeRankingsDescription(std::stringstream& description, std::vector<RankImprovement> players, const bool bIsTop)
+void EmbedGenerator::addPlayersToScrapeRankingsDescription(std::stringstream& description, std::vector<RankImprovement> players, const bool bIsTop, const Gamemode mode)
 {
     std::size_t displayUsersMax = (bIsTop ? k_numDisplayUsersTop : k_numDisplayUsersBottom);
 
@@ -340,7 +376,7 @@ void EmbedGenerator::addPlayersToScrapeRankingsDescription(std::stringstream& de
 
         // First line
         description << "**" << j << ".** :flag_" << user.countryCode << ": **[" << user.username << "](https://osu.ppy.sh/users/" << \
-            user.userID << "/osu)** **(" << user.performancePoints << "pp | " << user.accuracy << "% | " << user.hoursPlayed << "hrs)**\n";
+            user.userID << "/" << mode.toString() << ")** **(" << user.performancePoints << "pp | " << user.accuracy << "% | " << user.hoursPlayed << "hrs)**\n";
 
         // Second line
         description << "▸ Rank " << (bIsTop ? "increased" : "dropped") << " from #" << user.yesterdayRank << " to #" << user.currentRank << \

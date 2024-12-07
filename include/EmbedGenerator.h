@@ -30,16 +30,17 @@ public:
     ~EmbedGenerator() = default;
 
     dpp::embed helpEmbed();
-    dpp::embed scrapeRankingsEmbed(const std::string countryCode, const RankRange rankRange, std::vector<RankImprovement> top, std::vector<RankImprovement> bottom);
+    dpp::embed scrapeRankingsEmbed(const std::string countryCode, const RankRange rankRange, const Gamemode mode, std::vector<RankImprovement> top, std::vector<RankImprovement> bottom);
 
     dpp::component scrapeRankingsActionRow1();
     dpp::component scrapeRankingsActionRow2();
     dpp::interaction_modal_response scrapeRankingsFilterCountryModal();
+    dpp::interaction_modal_response scrapeRankingsFilterModeModal();
     bool parseMetadata(const dpp::message message, EmbedMetadata& metadata);
 
 private:
-    std::string metadataTag(const std::string countryCode, const RankRange rankRange);
-    void addPlayersToScrapeRankingsDescription(std::stringstream& description, std::vector<RankImprovement> players, const bool bIsTop);
+    std::string metadataTag(const std::string countryCode, const RankRange rankRange, const Gamemode mode);
+    void addPlayersToScrapeRankingsDescription(std::stringstream& description, std::vector<RankImprovement> players, const bool bIsTop, const Gamemode mode);
 };
 
 #endif /* __EMBED_GENERATOR_H__ */

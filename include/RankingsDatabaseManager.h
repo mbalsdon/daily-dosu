@@ -12,6 +12,14 @@
 #include <cstdint>
 #include <cstddef>
 #include <atomic>
+#include <unordered_map>
+
+const std::unordered_map<Gamemode, std::string> k_modeToTable = {
+    { Gamemode::Osu, "OsuRankings" },
+    { Gamemode::Taiko, "TaikoRankings" },
+    { Gamemode::Mania, "ManiaRankings" },
+    { Gamemode::Catch, "CatchRankings" }
+};
 
 /**
  * SQLiteCpp wrapper for the Rankings table.
@@ -30,14 +38,14 @@ public:
 
     std::filesystem::file_time_type lastWriteTime();
     void wipeTables();
-    void shiftRanks();
-    void insertRankingsUsers(std::vector<RankingsUser>& rankingsUsers);
-    void deleteUsersWithNullCurrentRank();
-    std::vector<UserID> getUserIDsWithNullYesterdayRank();
-    void updateYesterdayRanks(std::vector<std::pair<UserID, Rank>>& userYesterdayRanks);
-    bool isRankingsEmpty();
-    std::vector<RankImprovement> getTopRankImprovements(std::string countryCode, int64_t minRank, int64_t maxRank, std::size_t numUsers);
-    std::vector<RankImprovement> getBottomRankImprovements(std::string countryCode, int64_t minRank, int64_t maxRank, std::size_t numUsers);
+    void shiftRanks(Gamemode mode);
+    void insertRankingsUsers(std::vector<RankingsUser>& rankingsUsers, Gamemode mode);
+    void deleteUsersWithNullCurrentRank(Gamemode mode);
+    std::vector<UserID> getUserIDsWithNullYesterdayRank(Gamemode mode);
+    void updateYesterdayRanks(std::vector<std::pair<UserID, Rank>>& userYesterdayRanks, Gamemode mode);
+    bool hasEmptyRankingsTable();
+    std::vector<RankImprovement> getTopRankImprovements(std::string countryCode, int64_t minRank, int64_t maxRank, std::size_t numUsers, Gamemode mode);
+    std::vector<RankImprovement> getBottomRankImprovements(std::string countryCode, int64_t minRank, int64_t maxRank, std::size_t numUsers, Gamemode mode);
 
 private:
     RankingsDatabaseManager()

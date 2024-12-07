@@ -44,9 +44,12 @@ const std::string k_firstRangeButtonID = "first_range_button";
 const std::string k_secondRangeButtonID = "second_range_button";
 const std::string k_thirdRangeButtonID = "third_range_button";
 const std::string k_filterCountryButtonID = "filter_country_button";
-const std::string k_clearFiltersButtonID = "clear_filters_button";
 const std::string k_filterCountryModalID = "filter_country_modal";
 const std::string k_filterCountryTextInputID = "filter_country_text_input";
+const std::string k_selectModeButtonID = "select_mode_button";
+const std::string k_selectModeModalID = "select_mode_modal";
+const std::string k_selectModeTextInputID = "select_mode_text_input";
+const std::string k_resetAllButtonID = "reset_all_button";
 
 const std::string k_global = "GLOBAL";
 
@@ -153,7 +156,6 @@ public:
     RankRange() : m_value(Value::First) {}
     RankRange(Value v) : m_value(v) {}
     RankRange(int i) : m_value(static_cast<Value>(i)) {}
-    RankRange(std::string s) : m_value(static_cast<Value>(std::stoi(s))) {}
 
     bool operator==(const RankRange& other) const { return m_value == other.m_value; }
     bool operator==(Value v) const { return m_value == v; }
@@ -185,8 +187,98 @@ public:
         }
     }
 
+    Value getValue() const { return m_value; }
+
+private:
     Value m_value;
 };
+
+class Gamemode
+{
+public:
+    enum Mode
+    {
+        Osu,
+        Taiko,
+        Mania,
+        Catch
+    };
+
+    Gamemode() : m_mode(Mode::Osu) {}
+    Gamemode(Mode m) : m_mode(m) {}
+    Gamemode(int i) : m_mode(static_cast<Mode>(i)) {}
+
+    bool operator==(const Gamemode& other) const { return m_mode == other.m_mode; }
+    bool operator==(Mode m) const { return m_mode == m; }
+
+    std::string toString() const
+    {
+        switch (m_mode)
+        {
+        case Mode::Osu: return "osu";
+        case Mode::Taiko: return "taiko";
+        case Mode::Mania: return "mania";
+        case Mode::Catch: return "fruits";
+        default: return "UNKNOWN";
+        }
+    }
+
+    int toInt() const
+    {
+        return static_cast<int>(m_mode);
+    }
+
+    static bool fromString(const std::string s, Gamemode& mode)
+    {
+        std::string sl = s;
+        std::transform(sl.begin(), sl.end(), sl.begin(), ::tolower);
+
+        if ((sl == "osu") || (sl == "std") || (sl == "standard"))
+        {
+            mode = Mode::Osu;
+            return true;
+        }
+        else if (sl == "taiko")
+        {
+            mode = Mode::Taiko;
+            return true;
+        }
+        else if (sl == "mania")
+        {
+            mode = Mode::Mania;
+            return true;
+        }
+        else if ((sl == "catch") || (sl == "fruits"))
+        {
+            mode = Mode::Catch;
+            return true;
+        }
+
+        return false;
+    }
+
+    static Mode fromInt(const int i)
+    {
+        return static_cast<Mode>(i);
+    }
+
+    Mode getMode() const { return m_mode; }
+
+private:
+    Mode m_mode;
+};
+
+namespace std
+{
+template<>
+struct hash<Gamemode>
+{
+    size_t operator()(const Gamemode& gm) const
+    {
+        return hash<int>()(gm.toInt());
+    }
+};
+}
 
 class EmbedMetadata
 {
@@ -194,15 +286,18 @@ public:
     EmbedMetadata()
     : m_countryCode(k_global)
     , m_rankRange(RankRange())
+    , m_gamemode(Gamemode())
     {}
 
-    EmbedMetadata(std::string countryCode, RankRange rankRange)
+    EmbedMetadata(std::string countryCode, RankRange rankRange, Gamemode gamemode)
     : m_countryCode(countryCode)
     , m_rankRange(rankRange)
+    , m_gamemode(gamemode)
     {}
 
     std::string m_countryCode;
     RankRange m_rankRange;
+    Gamemode m_gamemode;
 };
 
 #endif /* __UTIL_H__ */

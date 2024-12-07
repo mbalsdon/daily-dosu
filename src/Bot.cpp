@@ -15,7 +15,7 @@
 #include <algorithm>
 #include <utility>
 
-namespace Detail
+namespace
 {
 RankRange buttonIDToRankRange(std::string buttonID)
 {
@@ -32,7 +32,7 @@ RankRange buttonIDToRankRange(std::string buttonID)
         return RankRange(2);
     }
 }
-} /* namespace Detail */
+} /* namespace */
 
 /**
  * Bot constructor.
@@ -113,7 +113,7 @@ void Bot::scrapeRankingsCallback()
 
     // Build message
     dpp::message message;
-    if (!buildNewsletter(k_global, RankRange(0), message))
+    if (!buildNewsletter(k_global, RankRange(0), Gamemode(0), message))
     {
         LOG_ERROR("Callback was triggered, but failed to build newsletter!");
         return;
@@ -123,7 +123,7 @@ void Bot::scrapeRankingsCallback()
     for (const auto& channelID : m_botConfigDbm.getChannelIDs())
     {
         message.channel_id = channelID;
-        std::string onCompletionID = std::string("send-to-channel-").append(std::to_string(channelID.operator uint64_t()));
+        std::string onCompletionID = std::string("send-to-channel_").append(std::to_string(channelID.operator uint64_t()));
         m_bot.message_create(message, std::bind(&Bot::onCompletion, this, std::placeholders::_1, onCompletionID));
     }
 }
@@ -267,7 +267,7 @@ void Bot::onButtonClick(const dpp::button_click_t& event)
             return;
         }
 
-        if (!buildNewsletter(embedMetadata.m_countryCode, Detail::buttonIDToRankRange(buttonID), message))
+        if (!buildNewsletter(embedMetadata.m_countryCode, buttonIDToRankRange(buttonID), embedMetadata.m_gamemode, message))
         {
             LOG_ERROR(buttonID, " was pressed, but failed to build newsletter!");
             event.reply(dpp::message("Failed to build new embed! This is a bug...").set_flags(dpp::m_ephemeral));
@@ -281,21 +281,18 @@ void Bot::onButtonClick(const dpp::button_click_t& event)
         dpp::interaction_modal_response modal = m_embedGenerator.scrapeRankingsFilterCountryModal();
         event.dialog(modal, std::bind(&Bot::onCompletion, this, std::placeholders::_1, buttonID));
     }
-    else if (buttonID == k_clearFiltersButtonID)
+    else if (buttonID == k_selectModeButtonID)
+    {
+        dpp::interaction_modal_response modal = m_embedGenerator.scrapeRankingsFilterModeModal();
+        event.dialog(modal, std::bind(&Bot::onCompletion, this, std::placeholders::_1, buttonID));
+    }
+    else if (buttonID == k_resetAllButtonID)
     {
         dpp::message message = event.command.msg;
 
-        EmbedMetadata embedMetadata;
-        if (!m_embedGenerator.parseMetadata(message, embedMetadata))
+        if (!buildNewsletter(k_global, RankRange(0), Gamemode(0), message))
         {
-            LOG_ERROR("Failed to parse metadata for current embed!");
-            event.reply(dpp::message("Failed to parse metadata! This is a bug...").set_flags(dpp::m_ephemeral));
-            return;
-        }
-
-        if (!buildNewsletter(k_global, embedMetadata.m_rankRange, message))
-        {
-            LOG_ERROR(k_clearFiltersButtonID, " was pressed, but failed to build newsletter!");
+            LOG_ERROR(k_resetAllButtonID, " was pressed, but failed to build newsletter!");
             event.reply(dpp::message("Failed to build new embed! This is a bug...").set_flags(dpp::m_ephemeral));
             return;
         }
@@ -338,9 +335,42 @@ void Bot::onFormSubmit(const dpp::form_submit_t& event)
             return;
         }
 
-        if (!buildNewsletter(countryCode, embedMetadata.m_rankRange, message))
+        if (!buildNewsletter(countryCode, embedMetadata.m_rankRange, embedMetadata.m_gamemode, message))
         {
-            LOG_ERROR(k_filterCountryModalID, " was submitted with countryCode=", countryCode, ", but failed to build newsletter!");
+            LOG_ERROR(k_filterCountryModalID, " was submitted with countryCode=", countryInput, ", but failed to build newsletter!");
+            event.reply(dpp::message("Failed to build new embed! This is a bug...").set_flags(dpp::m_ephemeral));
+            return;
+        }
+
+        m_bot.message_edit(message, std::bind(&Bot::onCompletionReply, this, std::placeholders::_1, formID, event));
+    }
+    else if (formID == k_selectModeModalID)
+    {
+        std::string modeInput = std::get<std::string>(event.components[0].components[0].value);
+        LOG_DEBUG("Processing request to select mode ", modeInput);
+
+        std::string modeInputUpper = modeInput;
+
+        Gamemode mode;
+        if (!Gamemode::fromString(modeInput, mode))
+        {
+            event.reply(dpp::message(modeInput + " is not a valid gamemode!").set_flags(dpp::m_ephemeral));
+            return;
+        }
+
+        dpp::message message = event.command.msg;
+
+        EmbedMetadata embedMetadata;
+        if (!m_embedGenerator.parseMetadata(message, embedMetadata))
+        {
+            LOG_ERROR("Failed to parse metadata for current embed!");
+            event.reply(dpp::message("Failed to parse metadata! This is a bug...").set_flags(dpp::m_ephemeral));
+            return;
+        }
+
+        if (!buildNewsletter(embedMetadata.m_countryCode, embedMetadata.m_rankRange, mode, message))
+        {
+            LOG_ERROR(k_selectModeModalID, " was submitted with mode=", modeInput, ", but failed to build newsletter!");
             event.reply(dpp::message("Failed to build new embed! This is a bug...").set_flags(dpp::m_ephemeral));
             return;
         }
@@ -440,7 +470,7 @@ void Bot::cmdPing(const dpp::slashcommand_t& event)
 void Bot::cmdNewsletter(const dpp::slashcommand_t& event)
 {
     dpp::message message;
-    if (!buildNewsletter(k_global, RankRange(0), message))
+    if (!buildNewsletter(k_global, RankRange(0), Gamemode(0), message))
     {
         LOG_WARN("Got command, but failed to build newsletter!");
         event.reply(dpp::message("Couldn't find newsletter! If you still see this message tomorrow, it might be a bug.").set_flags(dpp::m_ephemeral));
@@ -511,9 +541,9 @@ void Bot::buildStaticComponents()
 /**
  * Build newsletter. Returns true if data was valid, false otherwise.
  */
-bool Bot::buildNewsletter(const std::string countryCode, const RankRange rankRange, dpp::message& message)
+bool Bot::buildNewsletter(const std::string countryCode, const RankRange rankRange, const Gamemode mode, dpp::message& message)
 {
-    LOG_DEBUG("Building newsletter for countryCode=", countryCode, ", rankRange=", rankRange.toString(), "...");
+    LOG_DEBUG("Building newsletter for countryCode=", countryCode, ", rankRange=", rankRange.toString(), " mode=", mode.toString(), "...");
 
     auto lastWriteTime = m_rankingsDbm.lastWriteTime();
     auto now = std::filesystem::file_time_type::clock::now();
@@ -524,7 +554,7 @@ bool Bot::buildNewsletter(const std::string countryCode, const RankRange rankRan
         return false;
     }
 
-    if (m_rankingsDbm.isRankingsEmpty())
+    if (m_rankingsDbm.hasEmptyRankingsTable())
     {
         LOG_WARN("Data is invalid - rankings database is empty!");
         return false;
@@ -533,9 +563,9 @@ bool Bot::buildNewsletter(const std::string countryCode, const RankRange rankRan
     LOG_DEBUG("Data is valid - building newsletter...");
 
     auto range = rankRange.toRange();
-    std::vector<RankImprovement> rangeTop = m_rankingsDbm.getTopRankImprovements(countryCode, range.first, range.second, k_numDisplayUsers);
-    std::vector<RankImprovement> rangeBottom = m_rankingsDbm.getBottomRankImprovements(countryCode, range.first, range.second, k_numDisplayUsers);
-    dpp::embed newsletterEmbed = m_embedGenerator.scrapeRankingsEmbed(countryCode, std::move(rankRange), std::move(rangeTop), rangeBottom);
+    std::vector<RankImprovement> rangeTop = m_rankingsDbm.getTopRankImprovements(countryCode, range.first, range.second, k_numDisplayUsers, mode);
+    std::vector<RankImprovement> rangeBottom = m_rankingsDbm.getBottomRankImprovements(countryCode, range.first, range.second, k_numDisplayUsers, mode);
+    dpp::embed newsletterEmbed = m_embedGenerator.scrapeRankingsEmbed(std::move(countryCode), std::move(rankRange), std::move(mode), std::move(rangeTop), std::move(rangeBottom));
 
     message.embeds.clear();
     message.components.clear();

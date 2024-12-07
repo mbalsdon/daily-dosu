@@ -43,11 +43,11 @@ OsuWrapper::~OsuWrapper()
  * Data is returned in rankings.
  * Returns true if request succeeds, false if otherwise.
  */
-bool OsuWrapper::getRankings(Page page, nlohmann::json& rankings)
+bool OsuWrapper::getRankings(Page page, Gamemode mode, nlohmann::json& rankings)
 {
     page += 1;
 
-    LOG_DEBUG("Requesting page ", static_cast<int>(page), " ranking data from osu!API...");
+    LOG_DEBUG("Requesting page ", static_cast<int>(page), " ", mode.toString(), " ranking data from osu!API...");
 
     if (page > k_getRankingIDMaxPage)
     {
@@ -62,7 +62,7 @@ bool OsuWrapper::getRankings(Page page, nlohmann::json& rankings)
 
     curl_easy_reset(m_curlHandle);
 
-    std::string requestURL = std::string("https://osu.ppy.sh/api/v2/rankings/osu/performance?page=").append(std::to_string(static_cast<int>(page)));
+    std::string requestURL = "https://osu.ppy.sh/api/v2/rankings/" + mode.toString() + "/performance?page=" + std::to_string(static_cast<int>(page));
     curl_easy_setopt(m_curlHandle, CURLOPT_URL, requestURL.c_str());
 
     struct curl_slist* requestHeaders = nullptr;
@@ -73,26 +73,27 @@ bool OsuWrapper::getRankings(Page page, nlohmann::json& rankings)
     requestHeaders = curl_slist_append(requestHeaders, authString.c_str());
     curl_easy_setopt(m_curlHandle, CURLOPT_HTTPHEADER, requestHeaders);
 
-    std::string responseData;
-    curl_easy_setopt(m_curlHandle, CURLOPT_WRITEDATA, &responseData);
+    curl_easy_setopt(m_curlHandle, CURLOPT_WRITEDATA, &m_responseData);
     curl_easy_setopt(m_curlHandle, CURLOPT_WRITEFUNCTION, OsuWrapper::curlWriteCallback);
 
     curl_easy_setopt(m_curlHandle, CURLOPT_HTTPGET, 1L);
 
-    if (!makeRequest())
+    bool success = makeRequest();
+    curl_slist_free_all(requestHeaders);
+
+    if (!success)
     {
         return false;
     }
-    
-    curl_slist_free_all(requestHeaders);
 
-    nlohmann::json responseDataJson = nlohmann::json::parse(responseData);
+    nlohmann::json responseDataJson = nlohmann::json::parse(m_responseData);
+    m_responseData.clear();
     if (!responseDataJson.is_object())
     {
-        std::string reason = std::string("OsuWrapper::getRankingIDs - responseDataJson is not an object! responseData=").append(responseData);
+        std::string reason = std::string("OsuWrapper::getRankingIDs - responseDataJson is not an object! responseDataJson=").append(responseDataJson.dump());
         throw std::runtime_error(reason);
     }
-    
+
     rankings = responseDataJson;
     return true;
 }
@@ -100,10 +101,10 @@ bool OsuWrapper::getRankings(Page page, nlohmann::json& rankings)
 /**
  * Get osu! user given their ID.
  */
-bool OsuWrapper::getUser(UserID userID, nlohmann::json& user) 
+bool OsuWrapper::getUser(UserID userID, Gamemode mode, nlohmann::json& user) 
 {
-    LOG_DEBUG("Requesting data from osu!API for user with ID ", userID, "...");
-    
+    LOG_DEBUG("Requesting data from osu!API for ", mode.toString(), " user with ID ", userID, "...");
+
     if (!m_curlHandle)
     {
         std::string reason = "OsuWrapper::getUser - m_curlHandle does not exist!";
@@ -112,7 +113,7 @@ bool OsuWrapper::getUser(UserID userID, nlohmann::json& user)
 
     curl_easy_reset(m_curlHandle);
 
-    std::string requestURL = std::string("https://osu.ppy.sh/api/v2/users/").append(std::to_string(userID)).append("/osu?key=id");
+    std::string requestURL = "https://osu.ppy.sh/api/v2/users/" + std::to_string(userID) + "/" + mode.toString() + "?key=id";
     curl_easy_setopt(m_curlHandle, CURLOPT_URL, requestURL.c_str());
 
     struct curl_slist* requestHeaders = nullptr;
@@ -123,23 +124,24 @@ bool OsuWrapper::getUser(UserID userID, nlohmann::json& user)
     requestHeaders = curl_slist_append(requestHeaders, authString.c_str());
     curl_easy_setopt(m_curlHandle, CURLOPT_HTTPHEADER, requestHeaders);
 
-    std::string responseData;
-    curl_easy_setopt(m_curlHandle, CURLOPT_WRITEDATA, &responseData);
+    curl_easy_setopt(m_curlHandle, CURLOPT_WRITEDATA, &m_responseData);
     curl_easy_setopt(m_curlHandle, CURLOPT_WRITEFUNCTION, OsuWrapper::curlWriteCallback);
 
     curl_easy_setopt(m_curlHandle, CURLOPT_HTTPGET, 1L);
 
-    if (!makeRequest())
+    bool success = makeRequest();
+    curl_slist_free_all(requestHeaders);
+
+    if (!success)
     {
         return false;
     }
 
-    curl_slist_free_all(requestHeaders);
-
-    nlohmann::json responseDataJson = nlohmann::json::parse(responseData);
+    nlohmann::json responseDataJson = nlohmann::json::parse(m_responseData);
+    m_responseData.clear();
     if (!responseDataJson.is_object())
     {
-        std::string reason = std::string("OsuWrapper::getUser - responseDataJson is not an object! responseData=").append(responseData);
+        std::string reason = std::string("OsuWrapper::getUser - responseDataJson is not an object! responseDataJson=").append(responseDataJson.dump());
         throw std::runtime_error(reason);
     }
 
@@ -178,8 +180,7 @@ void OsuWrapper::updateToken()
     std::string requestBody = requestBodyJson.dump();
     curl_easy_setopt(tokenCurlHandle, CURLOPT_POSTFIELDS, requestBody.c_str());
 
-    std::string responseData;
-    curl_easy_setopt(tokenCurlHandle, CURLOPT_WRITEDATA, &responseData);
+    curl_easy_setopt(tokenCurlHandle, CURLOPT_WRITEDATA, &m_responseData);
     curl_easy_setopt(tokenCurlHandle, CURLOPT_WRITEFUNCTION, OsuWrapper::curlWriteCallback);
 
     CURLcode response = curl_easy_perform(tokenCurlHandle);
@@ -201,11 +202,12 @@ void OsuWrapper::updateToken()
 
     curl_slist_free_all(requestHeaders);
 
-    nlohmann::json responseDataJson = nlohmann::json::parse(responseData);
+    nlohmann::json responseDataJson = nlohmann::json::parse(m_responseData);
+    m_responseData.clear();
     if (!responseDataJson.is_object())
     {
         curl_easy_cleanup(tokenCurlHandle);
-        std::string reason = std::string("OsuWrapper::updateToken - responseDataJson is not an object! responseData=").append(responseData);
+        std::string reason = std::string("OsuWrapper::updateToken - responseDataJson is not an object! responseDataJson=").append(responseDataJson.dump());
         throw std::runtime_error(reason);
     }
 
@@ -216,7 +218,7 @@ void OsuWrapper::updateToken()
     catch (const std::exception& e)
     {
         curl_easy_cleanup(tokenCurlHandle);
-        std::string reason = std::string("OsuWrapper::updateToken - could not access responseDataJson fields! responseData=").append(responseData);
+        std::string reason = std::string("OsuWrapper::updateToken - could not access responseDataJson fields! responseDataJson=").append(responseDataJson.dump());
         throw std::out_of_range(reason);
     }
 }
@@ -254,6 +256,8 @@ bool OsuWrapper::makeRequest()
         }
         else // Something bad happened, ideally connectivity issues
         {
+            m_responseData.clear();
+
             int waitMs = k_curlRetryWaitMs - delayMs;
             if (waitMs < 0)
             {
