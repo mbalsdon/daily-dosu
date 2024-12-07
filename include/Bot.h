@@ -13,6 +13,7 @@
 #include <unordered_map>
 #include <chrono>
 #include <atomic>
+#include <mutex>
 
 const std::chrono::seconds k_cmdRateLimitPeriod = std::chrono::seconds(5);
 const std::chrono::seconds k_interactionRateLimitPeriod = std::chrono::seconds(3);
@@ -66,6 +67,8 @@ private:
 
     std::unordered_map<dpp::snowflake, std::chrono::steady_clock::time_point> m_latestCommands;
     std::unordered_map<dpp::snowflake, std::chrono::steady_clock::time_point> m_latestInteractions;
+    std::mutex m_latestCommandsMtx;
+    std::mutex m_latestInteractionsMtx;
 
     dpp::embed m_helpEmbed;
     dpp::component m_scrapeRankingsActionRow1;

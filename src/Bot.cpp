@@ -183,17 +183,20 @@ void Bot::onSlashCommand(const dpp::slashcommand_t& event)
     // Verify user is under ratelimit
     auto now = std::chrono::steady_clock::now();
     auto userID = event.command.usr.id;
-    if (m_latestCommands.count(userID))
     {
-        auto lastUsed = m_latestCommands[userID];
-        if (now - lastUsed < k_cmdRateLimitPeriod)
+        std::lock_guard<std::mutex> lock(m_latestCommandsMtx);
+        if (m_latestCommands.count(userID))
         {
-            LOG_DEBUG("Command from user ", userID.operator uint64_t(), " was blocked due to ratelimit!");
-            event.reply(dpp::message("You are using commands too quickly! Please wait a few seconds...").set_flags(dpp::m_ephemeral));
-            return;
+            auto lastUsed = m_latestCommands[userID];
+            if (now - lastUsed < k_cmdRateLimitPeriod)
+            {
+                LOG_DEBUG("Command from user ", userID.operator uint64_t(), " was blocked due to ratelimit!");
+                event.reply(dpp::message("You are using commands too quickly! Please wait a few seconds...").set_flags(dpp::m_ephemeral));
+                return;
+            }
         }
+        m_latestCommands[userID] = now;
     }
-    m_latestCommands[userID] = now;
 
     // Route command
     if (cmdName == k_cmdHelp)
@@ -235,17 +238,20 @@ void Bot::onButtonClick(const dpp::button_click_t& event)
     // Verify user is under ratelimit
     auto now = std::chrono::steady_clock::now();
     auto userID = event.command.usr.id;
-    if (m_latestInteractions.count(userID))
     {
-        auto lastUsed = m_latestInteractions[userID];
-        if (now - lastUsed < k_interactionRateLimitPeriod)
+        std::lock_guard<std::mutex> lock(m_latestInteractionsMtx);
+        if (m_latestInteractions.count(userID))
         {
-            LOG_DEBUG("Buttonpress from user ", userID.operator uint64_t(), " was blocked due to ratelimit");
-            event.reply(dpp::message("You are pressing buttons too quickly! Please wait a few seconds...").set_flags(dpp::m_ephemeral));
-            return;
+            auto lastUsed = m_latestInteractions[userID];
+            if (now - lastUsed < k_interactionRateLimitPeriod)
+            {
+                LOG_DEBUG("Buttonpress from user ", userID.operator uint64_t(), " was blocked due to ratelimit");
+                event.reply(dpp::message("You are pressing buttons too quickly! Please wait a few seconds...").set_flags(dpp::m_ephemeral));
+                return;
+            }
         }
+        m_latestInteractions[userID] = now;
     }
-    m_latestInteractions[userID] = now;
 
     // Route buttonpress
     if ((buttonID == k_firstRangeButtonID) ||
