@@ -15,8 +15,8 @@
 #include <atomic>
 #include <mutex>
 
-const std::chrono::seconds k_cmdRateLimitPeriod = std::chrono::seconds(5);
-const std::chrono::seconds k_interactionRateLimitPeriod = std::chrono::seconds(3);
+const std::chrono::seconds k_cmdRateLimitPeriod = std::chrono::seconds(2);
+const std::chrono::seconds k_interactionRateLimitPeriod = std::chrono::seconds(1);
 
 /**
  * DPP wrapper for the Discord bot. All event handling logic (and nothing else) should go here.
@@ -57,7 +57,7 @@ private:
     void cmdUnsubscribe(const dpp::slashcommand_t& event);
 
     void buildStaticComponents();
-    bool buildNewsletter(const std::string countryCode, const RankRange rankRange, dpp::message& message);
+    bool buildNewsletter(const std::string countryCode, const RankRange rankRange, const Gamemode mode, dpp::message& message);
 
     dpp::cluster m_bot;
     RankingsDatabaseManager& m_rankingsDbm;

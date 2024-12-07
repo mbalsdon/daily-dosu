@@ -17,7 +17,7 @@ int DosuConfig::scrapeRankingsRunHour;
 std::filesystem::path DosuConfig::rankingsDatabaseFilePath;
 std::filesystem::path DosuConfig::botConfigDatabaseFilePath;
 
-namespace Detail
+namespace
 {
 /**
  * Convert given hour from UTC to system timezone.
@@ -53,7 +53,7 @@ int utcToLocal(int utcHour)
 
     return localHour;
 }
-}
+} /* namespace */
 
 /**
  * Load JSON configuration.
@@ -102,7 +102,7 @@ void DosuConfig::setupConfig(std::filesystem::path filePath)
 
     nlohmann::json newConfigJson;
     newConfigJson[k_logLevelKey] = 1;
-    newConfigJson[k_scrapeRankingsRunHourKey] = Detail::utcToLocal(5);
+    newConfigJson[k_scrapeRankingsRunHourKey] = utcToLocal(5);
 
     std::string botToken;
     std::string clientID;
