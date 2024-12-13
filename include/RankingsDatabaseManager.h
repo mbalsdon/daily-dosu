@@ -54,8 +54,11 @@ private:
     {}
 
     ~RankingsDatabaseManager();
+
     RankingsDatabaseManager(const RankingsDatabaseManager&) = delete;
+    RankingsDatabaseManager(RankingsDatabaseManager&&) = delete;
     RankingsDatabaseManager& operator=(const RankingsDatabaseManager&) = delete;
+    RankingsDatabaseManager& operator=(RankingsDatabaseManager&&) = delete;
 
     void createTables();
 

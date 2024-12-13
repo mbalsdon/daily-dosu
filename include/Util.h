@@ -55,7 +55,6 @@ const std::string k_global = "GLOBAL";
 
 /* - - - - - - - - Types - - - - - - - */
 
-typedef std::string OAuthToken;
 typedef std::size_t Page;
 
 typedef int64_t UserID;

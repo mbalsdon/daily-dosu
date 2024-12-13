@@ -28,7 +28,7 @@ void processRankingsUsers(
 {
     LOG_INFO("Executing thread ", std::this_thread::get_id(), " for pages ", start, "-", end - 1, " for mode ", mode.toString(), "...");
     std::vector<RankingsUser> rankingsUsersChunk;
-    OsuWrapper osu(DosuConfig::osuClientID, DosuConfig::osuClientSecret, 0);
+    OsuWrapper osu(0);
     for (Page page = start; page < end; ++page)
     {
         nlohmann::json rankingsObj;
@@ -73,7 +73,7 @@ void processUsers(
 {
     LOG_INFO("Executing thread ", std::this_thread::get_id(), " for ", end - start, " users, for mode ", mode.toString(), "...");
     std::vector<std::pair<UserID, Rank>> remainingUserRanksChunk;
-    OsuWrapper osu(DosuConfig::osuClientID, DosuConfig::osuClientSecret, 0);
+    OsuWrapper osu(0);
     for (std::size_t j = start; j < end; ++j)
     {
         nlohmann::json userObj;

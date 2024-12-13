@@ -1,13 +1,14 @@
 - TODO
---- other modes support
------ got 429'ed while requesting token; have all threads use same wrapper/token? watch out for concurrency
------ testing (run on mock; also see if we can use that for prod)
-
 --- clean up metadata functions (use iterator or sth)
+----- maybe delimit with / instead of `\n`
+
 --- update to cpp20, update libraries (dpp making valgrind cry)
+
 --- compiler optimizations ([[nodiscard]], noexcept)
+
 --- job: highest plays today (or something)
 ----- https://github.com/Ameobea/osutrack-api ("Get the best plays by pp for all users in a given mode")
 ----- better to just grab recent tops from those w/ highest rank gain?
 ----- how to format output? probably Xth actionrow for swapping between "jobs" (newsletter pages)
+
 --- job: anyone who broke a digit range (X reached 2 digit)
