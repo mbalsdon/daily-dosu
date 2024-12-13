@@ -7,6 +7,9 @@
 #include "OsuWrapper.h"
 #include "RankingsDatabaseManager.h"
 #include "BotConfigDatabaseManager.h"
+#include "TokenManager.h"
+
+#include <curl/curl.h>
 
 #include <functional>
 #include <thread>
@@ -76,7 +79,11 @@ int main()
         DosuConfig::load(k_dosuConfigFilePath);
 
         // Initialize services
+        curl_global_init(CURL_GLOBAL_ALL);
         Logger::getInstance().setLogLevel(DosuConfig::logLevel);
+
+        TokenManager& tokenManager = TokenManager::getInstance();
+        tokenManager.initialize(DosuConfig::osuClientID, DosuConfig::osuClientSecret);
 
         RankingsDatabaseManager& rankingsDbm = RankingsDatabaseManager::getInstance();
         rankingsDbm.initialize(DosuConfig::rankingsDatabaseFilePath);
@@ -107,8 +114,10 @@ int main()
         LOG_INFO("Cleaning up resources and connections - PLEASE DON'T SHUT DOWN...");
         scrapeRankingsJob.stop();
         bot.stop();
+        tokenManager.cleanup();
         rankingsDbm.cleanup();
         botConfigDbm.cleanup();
+        curl_global_cleanup();
 
         LOG_INFO("Cleanup complete! Exiting...");
         Logger::getInstance().setLogLevel(Logger::Level::ERROR); // Quiet destructor logs; we already cleaned

@@ -15,6 +15,7 @@ set(SOURCES
     src/RankingsDatabaseManager.cpp
     src/BotConfigDatabaseManager.cpp
     src/EmbedGenerator.cpp
+    src/TokenManager.cpp
 )
 
 add_executable(${PROJECT_NAME} ${SOURCES})

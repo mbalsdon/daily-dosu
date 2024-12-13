@@ -37,8 +37,11 @@ private:
     {}
 
     ~BotConfigDatabaseManager();
+
     BotConfigDatabaseManager(const BotConfigDatabaseManager&) = delete;
+    BotConfigDatabaseManager(BotConfigDatabaseManager&&) = delete;
     BotConfigDatabaseManager& operator=(const BotConfigDatabaseManager&) = delete;
+    BotConfigDatabaseManager& operator=(BotConfigDatabaseManager&&) = delete;
 
     void createTables();
 

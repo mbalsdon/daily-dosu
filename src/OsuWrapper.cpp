@@ -1,5 +1,6 @@
 #include "OsuWrapper.h"
 #include "Logger.h"
+#include "TokenManager.h"
 
 #include <iostream>
 #include <thread>
@@ -9,18 +10,21 @@
 /**
  * OsuWrapper constructor.
  */
-OsuWrapper::OsuWrapper(const std::string& clientID, const std::string& clientSecret, const int apiCooldownMs)
+OsuWrapper::OsuWrapper(const int apiCooldownMs)
 {
     LOG_DEBUG("Constructing OsuWrapper...");
 
-    m_clientID = clientID;
-    m_clientSecret = clientSecret;
     m_apiCooldownMs = apiCooldownMs;
 
-    curl_global_init(CURL_GLOBAL_ALL);
     m_curlHandle = curl_easy_init();
+    if (!m_curlHandle)
+    {
+        std::string reason = "Failed to initialize CURL handle in OsuWrapper!";
+        throw std::runtime_error(reason);
+    }
 
-    updateToken();
+    curl_easy_setopt(m_curlHandle, CURLOPT_WRITEDATA, &m_responseData);
+    curl_easy_setopt(m_curlHandle, CURLOPT_WRITEFUNCTION, OsuWrapper::curlWriteCallback);
 }
 
 /**
@@ -33,7 +37,6 @@ OsuWrapper::~OsuWrapper()
     if (m_curlHandle)
     {
         curl_easy_cleanup(m_curlHandle);
-        curl_global_cleanup();
     }
 }
 
@@ -54,33 +57,9 @@ bool OsuWrapper::getRankings(Page page, Gamemode mode, nlohmann::json& rankings)
         std::string reason = std::string("OsuWrapper::getRankingIDs - page cannot be greater than k_getRankingIDMaxPage! page=").append(std::to_string(page));
         throw std::invalid_argument(reason);
     }
-    if (!m_curlHandle)
-    {
-        std::string reason = "OsuWrapper::getRankingIDs - m_curlHandle does not exist!";
-        throw std::runtime_error(reason);
-    }
-
-    curl_easy_reset(m_curlHandle);
 
     std::string requestURL = "https://osu.ppy.sh/api/v2/rankings/" + mode.toString() + "/performance?page=" + std::to_string(static_cast<int>(page));
-    curl_easy_setopt(m_curlHandle, CURLOPT_URL, requestURL.c_str());
-
-    struct curl_slist* requestHeaders = nullptr;
-    std::string authString = "Authorization: Bearer ";
-    authString = authString.append(m_accessToken);
-    requestHeaders = curl_slist_append(requestHeaders, "Content-Type: application/json");
-    requestHeaders = curl_slist_append(requestHeaders, "Accept: application/json");
-    requestHeaders = curl_slist_append(requestHeaders, authString.c_str());
-    curl_easy_setopt(m_curlHandle, CURLOPT_HTTPHEADER, requestHeaders);
-
-    curl_easy_setopt(m_curlHandle, CURLOPT_WRITEDATA, &m_responseData);
-    curl_easy_setopt(m_curlHandle, CURLOPT_WRITEFUNCTION, OsuWrapper::curlWriteCallback);
-
-    curl_easy_setopt(m_curlHandle, CURLOPT_HTTPGET, 1L);
-
-    bool success = makeRequest();
-    curl_slist_free_all(requestHeaders);
-
+    bool success = makeRequest(requestURL, CURLOPT_HTTPGET);
     if (!success)
     {
         return false;
@@ -105,33 +84,8 @@ bool OsuWrapper::getUser(UserID userID, Gamemode mode, nlohmann::json& user)
 {
     LOG_DEBUG("Requesting data from osu!API for ", mode.toString(), " user with ID ", userID, "...");
 
-    if (!m_curlHandle)
-    {
-        std::string reason = "OsuWrapper::getUser - m_curlHandle does not exist!";
-        throw std::runtime_error(reason);
-    }
-
-    curl_easy_reset(m_curlHandle);
-
     std::string requestURL = "https://osu.ppy.sh/api/v2/users/" + std::to_string(userID) + "/" + mode.toString() + "?key=id";
-    curl_easy_setopt(m_curlHandle, CURLOPT_URL, requestURL.c_str());
-
-    struct curl_slist* requestHeaders = nullptr;
-    std::string authString = "Authorization: Bearer ";
-    authString = authString.append(m_accessToken);
-    requestHeaders = curl_slist_append(requestHeaders, "Content-Type: application/json");
-    requestHeaders = curl_slist_append(requestHeaders, "Accept: application/json");
-    requestHeaders = curl_slist_append(requestHeaders, authString.c_str());
-    curl_easy_setopt(m_curlHandle, CURLOPT_HTTPHEADER, requestHeaders);
-
-    curl_easy_setopt(m_curlHandle, CURLOPT_WRITEDATA, &m_responseData);
-    curl_easy_setopt(m_curlHandle, CURLOPT_WRITEFUNCTION, OsuWrapper::curlWriteCallback);
-
-    curl_easy_setopt(m_curlHandle, CURLOPT_HTTPGET, 1L);
-
-    bool success = makeRequest();
-    curl_slist_free_all(requestHeaders);
-
+    bool success = makeRequest(requestURL, CURLOPT_HTTPGET);
     if (!success)
     {
         return false;
@@ -150,80 +104,6 @@ bool OsuWrapper::getUser(UserID userID, Gamemode mode, nlohmann::json& user)
 }
 
 /**
- * Update OsuWrapper token field with new OAauth Client Credentials token.
- */
-void OsuWrapper::updateToken()
-{
-    LOG_DEBUG("Requesting OAuth token from osu!API...");
-
-    CURL * tokenCurlHandle = curl_easy_init();
-    if (!tokenCurlHandle)
-    {
-        std::string reason = "OsuWrapper::updateToken - tokenCurlHandle does not exist!";
-        throw std::runtime_error(reason);
-    }
-
-    std::string requestURL = "https://osu.ppy.sh/oauth/token";
-    curl_easy_setopt(tokenCurlHandle, CURLOPT_URL, requestURL.c_str());
-
-    struct curl_slist* requestHeaders = nullptr;
-    requestHeaders = curl_slist_append(requestHeaders, "Content-Type: application/json");
-    requestHeaders = curl_slist_append(requestHeaders, "Accept: application/json");
-    curl_easy_setopt(tokenCurlHandle, CURLOPT_HTTPHEADER, requestHeaders);
-
-    nlohmann::json requestBodyJson = {
-        { "client_id", m_clientID },
-        { "client_secret", m_clientSecret },
-        { "grant_type", "client_credentials" },
-        { "scope", "public" }
-    };
-    std::string requestBody = requestBodyJson.dump();
-    curl_easy_setopt(tokenCurlHandle, CURLOPT_POSTFIELDS, requestBody.c_str());
-
-    curl_easy_setopt(tokenCurlHandle, CURLOPT_WRITEDATA, &m_responseData);
-    curl_easy_setopt(tokenCurlHandle, CURLOPT_WRITEFUNCTION, OsuWrapper::curlWriteCallback);
-
-    CURLcode response = curl_easy_perform(tokenCurlHandle);
-    if (response != CURLE_OK)
-    {
-        curl_easy_cleanup(tokenCurlHandle);
-        std::string reason = std::string("OsuWrapper::updateToken - request failed; got CURLcode ").append(std::to_string(response));
-        throw std::runtime_error(reason);
-    }
-
-    long httpCode = 0;
-    curl_easy_getinfo(tokenCurlHandle, CURLINFO_RESPONSE_CODE, &httpCode);
-    if (httpCode != 200)
-    {
-        curl_easy_cleanup(tokenCurlHandle);
-        std::string reason = std::string("OsuWrapper::updateToken - request failed; got HTTP code ").append(std::to_string(httpCode));
-        throw std::runtime_error(reason);
-    }
-
-    curl_slist_free_all(requestHeaders);
-
-    nlohmann::json responseDataJson = nlohmann::json::parse(m_responseData);
-    m_responseData.clear();
-    if (!responseDataJson.is_object())
-    {
-        curl_easy_cleanup(tokenCurlHandle);
-        std::string reason = std::string("OsuWrapper::updateToken - responseDataJson is not an object! responseDataJson=").append(responseDataJson.dump());
-        throw std::runtime_error(reason);
-    }
-
-    try
-    {
-        m_accessToken = responseDataJson.at("access_token").get<OAuthToken>();
-    }
-    catch (const std::exception& e)
-    {
-        curl_easy_cleanup(tokenCurlHandle);
-        std::string reason = std::string("OsuWrapper::updateToken - could not access responseDataJson fields! responseDataJson=").append(responseDataJson.dump());
-        throw std::out_of_range(reason);
-    }
-}
-
-/**
  * WARNING: It is possible for this function to retry forever!
  *
  * Make CURL request.
@@ -232,22 +112,30 @@ void OsuWrapper::updateToken()
  * Status code logic is implemented according to [osu-web](https://github.com/ppy/osu-web/blob/master/resources/lang/en/layout.php).
  * Return true if request succeeds, false if not.
  */
-bool OsuWrapper::makeRequest()
+bool OsuWrapper::makeRequest(const std::string requestURL, const CURLoption method)
 {
-    if (!m_curlHandle)
-    {
-        std::string reason = "OsuWrapper::makeRequest - m_curlHandle does not exist!";
-        throw std::runtime_error(reason);
-    }
+    curl_easy_setopt(m_curlHandle, CURLOPT_URL, requestURL.c_str());
+    curl_easy_setopt(m_curlHandle, method, 1L);
 
     std::size_t retries = 0;
     int delayMs = m_apiCooldownMs;
     while (true)
     {
-        long httpCode = 0;
-
         std::this_thread::sleep_for(std::chrono::milliseconds(delayMs));
+
+        m_responseData.clear();
+
+        struct curl_slist* requestHeaders = nullptr;
+        std::string authString = "Authorization: Bearer ";
+        authString = authString.append(TokenManager::getInstance().getAccessToken());
+        requestHeaders = curl_slist_append(requestHeaders, "Content-Type: application/json");
+        requestHeaders = curl_slist_append(requestHeaders, "Accept: application/json");
+        requestHeaders = curl_slist_append(requestHeaders, authString.c_str());
+        curl_easy_setopt(m_curlHandle, CURLOPT_HTTPHEADER, requestHeaders);
+
+        long httpCode = 0;
         CURLcode response = curl_easy_perform(m_curlHandle);
+        curl_slist_free_all(requestHeaders);
 
         // Handle CURL code
         if (response == CURLE_OK) // Server responded
@@ -256,8 +144,6 @@ bool OsuWrapper::makeRequest()
         }
         else // Something bad happened, ideally connectivity issues
         {
-            m_responseData.clear();
-
             int waitMs = k_curlRetryWaitMs - delayMs;
             if (waitMs < 0)
             {
@@ -277,7 +163,7 @@ bool OsuWrapper::makeRequest()
         else if (httpCode == 401) // 401 Unauthorized - refresh token
         {
             LOG_WARN("Got 401, refreshing OAuth token...");
-            updateToken();
+            TokenManager::getInstance().updateAccessToken();
         }
         else if (httpCode == 404) // 404 Not Found
         {
@@ -296,7 +182,7 @@ bool OsuWrapper::makeRequest()
                 delayMs = static_cast<int>((std::pow(2, retries) + offset) * 1000.);
             }
 
-            LOG_WARN("Request failed; retrying in ", std::to_string(delayMs), "ms...");
+            LOG_WARN("Request failed (", httpCode, "); retrying in ", std::to_string(delayMs), "ms...");
             ++retries;
         }
         else
