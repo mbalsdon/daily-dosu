@@ -36,11 +36,7 @@ First-time users will be guided through a simple setup tool to generate a config
 - A registered [Discord bot](https://discord.com/developers/applications)
 
 ## Contributing
-If you find any bugs or want to request a feature, feel free to open an [issue](https://github.com/mbalsdon/daily-dosu/issues). If you are reporting a bug, try to include as much detail as you can as well as steps on how to reproduce it (if possible). If you are requesting a feature, please describe the feature in as most detail as possible as well as some use-cases for it.
-
-If you want to make changes, feel free to open a PR.
-
-If you want to contact me directly, my DMs are open on Discord @spreadnuts.
+If you find any bugs or want to request a feature, feel free to open an [issue](https://github.com/mbalsdon/daily-dosu/issues). If you want to make changes, feel free to open a PR. For direct contact, my DMs are open on Discord @spreadnuts.
 
 ## Internals
 
