@@ -70,6 +70,12 @@ private:
     std::mutex m_latestCommandsMtx;
     std::mutex m_latestInteractionsMtx;
 
+    dpp::event_handle m_onLogId;
+    dpp::event_handle m_onReadyId;
+    dpp::event_handle m_onSlashCommandId;
+    dpp::event_handle m_onButtonClickId;
+    dpp::event_handle m_onFormSubmitId;
+
     dpp::embed m_helpEmbed;
     dpp::component m_scrapeRankingsActionRow1;
     dpp::component m_scrapeRankingsActionRow2;
