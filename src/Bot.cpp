@@ -70,11 +70,11 @@ void Bot::start()
 
     LOG_INFO("Starting Discord bot...");
 
-    m_bot.on_log(std::bind(&Bot::onLog, this, std::placeholders::_1));
-    m_bot.on_ready(std::bind(&Bot::onReady, this, std::placeholders::_1));
-    m_bot.on_slashcommand(std::bind(&Bot::onSlashCommand, this, std::placeholders::_1));
-    m_bot.on_button_click(std::bind(&Bot::onButtonClick, this, std::placeholders::_1));
-    m_bot.on_form_submit(std::bind(&Bot::onFormSubmit, this, std::placeholders::_1));
+    m_onLogId = m_bot.on_log(std::bind(&Bot::onLog, this, std::placeholders::_1));
+    m_onReadyId = m_bot.on_ready(std::bind(&Bot::onReady, this, std::placeholders::_1));
+    m_onSlashCommandId = m_bot.on_slashcommand(std::bind(&Bot::onSlashCommand, this, std::placeholders::_1));
+    m_onButtonClickId = m_bot.on_button_click(std::bind(&Bot::onButtonClick, this, std::placeholders::_1));
+    m_onFormSubmitId = m_bot.on_form_submit(std::bind(&Bot::onFormSubmit, this, std::placeholders::_1));
 
     m_bot.start(dpp::st_return);
 
@@ -94,12 +94,13 @@ void Bot::stop()
 
     LOG_INFO("Stopping Discord bot...");
 
-    m_bot.shutdown();
+    m_bot.on_ready.detach(m_onLogId);
+    m_bot.on_slashcommand.detach(m_onReadyId);
+    m_bot.on_button_click.detach(m_onSlashCommandId);
+    m_bot.on_log.detach(m_onButtonClickId);
+    m_bot.on_form_submit.detach(m_onFormSubmitId);
 
-    m_bot.on_ready({});
-    m_bot.on_slashcommand({});
-    m_bot.on_button_click({});
-    m_bot.on_log({});
+    m_bot.shutdown();
 
     m_bIsInitialized = false;
 }
@@ -222,7 +223,7 @@ void Bot::onSlashCommand(const dpp::slashcommand_t& event)
     else
     {
         LOG_WARN("Got unknown slash command /", cmdName, "; attempting to remove it...");
-        std::thread(&Bot::deleteGlobalCommand, this, cmdName).detach();
+        deleteGlobalCommand(cmdName);
         event.reply(dpp::message("Command does not exist! If it is still listed in a few minutes, this may be a bug.").set_flags(dpp::m_ephemeral));
     }
 }
@@ -422,28 +423,38 @@ void Bot::onCompletionReply(const dpp::confirmation_callback_t& callback, const 
 }
 
 /**
- * WARNING: This function is blocking and should be called in a seperate thread rather than in event handlers.
- *
  * Delete global command by name.
  */
 void Bot::deleteGlobalCommand(std::string cmdName)
 {
     LOG_DEBUG("Removing stale command ", cmdName, "...");
-    try
-    {
-        auto slashCommands = m_bot.global_commands_get_sync();
-        for (const auto& cmd : slashCommands)
+
+    m_bot.global_commands_get(
+        [this, cmdName](const dpp::confirmation_callback_t& getCallback)
         {
-            if (cmd.second.name == cmdName)
+            if (getCallback.is_error())
             {
-                m_bot.global_command_delete_sync(cmd.first);
+                auto error = getCallback.get_error();
+                LOG_WARN("Failed to get global commands; ", error.message);
             }
-        }
-    }
-    catch(const std::exception& e)
-    {
-        LOG_ERROR("Caught error while trying to delete command ", cmdName, "; ", e.what());
-    }
+
+            auto slashCommands = getCallback.get<dpp::slashcommand_map>();
+            for (const auto& cmd : slashCommands)
+            {
+                if (cmd.second.name == cmdName)
+                {
+                    m_bot.global_command_delete(cmd.first,
+                        [cmd](const dpp::confirmation_callback_t& deleteCallback)
+                        {
+                            if (deleteCallback.is_error())
+                            {
+                                auto error = deleteCallback.get_error();
+                                LOG_WARN("Failed to delete global command ", cmd.first, "; ", error.message);
+                            }
+                        });
+                }
+            }
+        });
 }
 
 /**

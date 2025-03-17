@@ -102,7 +102,7 @@ void DosuConfig::setupConfig(std::filesystem::path filePath)
 
     nlohmann::json newConfigJson;
     newConfigJson[k_logLevelKey] = 1;
-    newConfigJson[k_scrapeRankingsRunHourKey] = utcToLocal(5);
+    newConfigJson[k_scrapeRankingsRunHourKey] = utcToLocal(3);
 
     std::string botToken;
     std::string clientID;
