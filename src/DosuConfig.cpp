@@ -14,8 +14,11 @@ std::string DosuConfig::discordBotToken;
 std::string DosuConfig::osuClientID;
 std::string DosuConfig::osuClientSecret;
 int DosuConfig::scrapeRankingsRunHour;
+int DosuConfig::topPlaysRunHour;
 std::filesystem::path DosuConfig::rankingsDatabaseFilePath;
+std::filesystem::path DosuConfig::topPlaysDatabaseFilePath;
 std::filesystem::path DosuConfig::botConfigDatabaseFilePath;
+std::map<std::string, std::string> DosuConfig::discordBotStrings;
 
 namespace
 {
@@ -81,6 +84,7 @@ void DosuConfig::load(std::filesystem::path filePath)
         DosuConfig::logLevel = 1;
     }
     DosuConfig::discordBotToken = configDataJson.at(k_discordBotTokenKey);
+    DosuConfig::discordBotStrings = configDataJson.at(k_discordBotStringsKey).get<std::map<std::string, std::string>>();
     DosuConfig::osuClientID = configDataJson.at(k_osuClientIdKey);
     DosuConfig::osuClientSecret = configDataJson.at(k_osuClientSecretKey);
     DosuConfig::scrapeRankingsRunHour = configDataJson.at(k_scrapeRankingsRunHourKey);
@@ -89,7 +93,14 @@ void DosuConfig::load(std::filesystem::path filePath)
         DosuConfig::scrapeRankingsRunHour = DosuConfig::scrapeRankingsRunHour % 24;
         LOG_WARN("Configured ", k_scrapeRankingsRunHourKey, " is out of bounds! Normalizing to ", DosuConfig::scrapeRankingsRunHour, "...");
     }
+    DosuConfig::topPlaysRunHour = configDataJson.at(k_topPlaysRunHourKey);
+    if (DosuConfig::topPlaysRunHour < 0 || DosuConfig::topPlaysRunHour > 23)
+    {
+        DosuConfig::topPlaysRunHour = DosuConfig::topPlaysRunHour % 24;
+        LOG_WARN("Configured ", k_topPlaysRunHourKey, " is out of bounds! Normalizing to ", DosuConfig::topPlaysRunHour, "...");
+    }
     DosuConfig::rankingsDatabaseFilePath = std::filesystem::path(configDataJson.at(k_rankingsDbFilePathKey));
+    DosuConfig::topPlaysDatabaseFilePath = std::filesystem::path(configDataJson.at(k_topPlaysDbFilePathKey));
     DosuConfig::botConfigDatabaseFilePath = std::filesystem::path(configDataJson.at(k_botConfigDbFilePathKey));
 }
 
@@ -103,6 +114,7 @@ void DosuConfig::setupConfig(std::filesystem::path filePath)
     nlohmann::json newConfigJson;
     newConfigJson[k_logLevelKey] = 1;
     newConfigJson[k_scrapeRankingsRunHourKey] = utcToLocal(3);
+    newConfigJson[k_topPlaysRunHourKey] = utcToLocal(3);
 
     std::string botToken;
     std::string clientID;
@@ -120,7 +132,47 @@ void DosuConfig::setupConfig(std::filesystem::path filePath)
     newConfigJson[k_osuClientIdKey] = clientID;
     newConfigJson[k_osuClientSecretKey] = clientSecret;
     newConfigJson[k_rankingsDbFilePathKey] = k_dataDir / "rankings.db";
+    newConfigJson[k_topPlaysDbFilePathKey] = k_dataDir / "top_plays.db";
     newConfigJson[k_botConfigDbFilePathKey] = k_dataDir / "bot_config.db";
+
+    nlohmann::json defaultDiscordBotStrings;
+    defaultDiscordBotStrings[k_letterRankXKey]  = "X";
+    defaultDiscordBotStrings[k_letterRankXHKey] = "XH";
+    defaultDiscordBotStrings[k_letterRankSKey]  = "S";
+    defaultDiscordBotStrings[k_letterRankSHKey] = "SH";
+    defaultDiscordBotStrings[k_letterRankDKey]  = "D";
+    defaultDiscordBotStrings[k_letterRankCKey]  = "C";
+    defaultDiscordBotStrings[k_letterRankBKey]  = "B";
+    defaultDiscordBotStrings[k_letterRankAKey]  = "A";
+    defaultDiscordBotStrings[k_modTPKey] = "TP";
+    defaultDiscordBotStrings[k_modSDKey] = "SD";
+    defaultDiscordBotStrings[k_modSOKey] = "SO";
+    defaultDiscordBotStrings[k_modAPKey] = "AP";
+    defaultDiscordBotStrings[k_modRXKey] = "RX";
+    defaultDiscordBotStrings[k_modRDKey] = "RD";
+    defaultDiscordBotStrings[k_modPFKey] = "PF";
+    defaultDiscordBotStrings[k_modNFKey] = "NF";
+    defaultDiscordBotStrings[k_modNCKey] = "NC";
+    defaultDiscordBotStrings[k_modCPKey] = "CP";
+    defaultDiscordBotStrings[k_mod9KKey] = "9K";
+    defaultDiscordBotStrings[k_mod8KKey] = "8K";
+    defaultDiscordBotStrings[k_mod7KKey] = "7K";
+    defaultDiscordBotStrings[k_mod6KKey] = "6K";
+    defaultDiscordBotStrings[k_mod5KKey] = "5K";
+    defaultDiscordBotStrings[k_mod4KKey] = "4K";
+    defaultDiscordBotStrings[k_mod3KKey] = "3K";
+    defaultDiscordBotStrings[k_mod2KKey] = "2K";
+    defaultDiscordBotStrings[k_mod1KKey] = "1K";
+    defaultDiscordBotStrings[k_modHDKey] = "HD";
+    defaultDiscordBotStrings[k_modHRKey] = "HR";
+    defaultDiscordBotStrings[k_modHTKey] = "HT";
+    defaultDiscordBotStrings[k_modFLKey] = "FL";
+    defaultDiscordBotStrings[k_modFIKey] = "FI";
+    defaultDiscordBotStrings[k_modEZKey] = "EZ";
+    defaultDiscordBotStrings[k_modDTKey] = "DT";
+    defaultDiscordBotStrings[k_modCMKey] = "CM";
+    defaultDiscordBotStrings[k_modATKey] = "AT";
+    newConfigJson[k_discordBotStringsKey] = defaultDiscordBotStrings;
 
     std::ofstream outputFile(filePath);
     outputFile << newConfigJson.dump(4) << std::endl;

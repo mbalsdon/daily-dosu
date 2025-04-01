@@ -8,16 +8,11 @@
 
 #include <string>
 #include <cstddef>
-#include <vector>
-#include <mutex>
-
-const int k_curlRetryWaitMs = 30000;
 
 /**
- * osu!API v2 wrapper. Only implements endpoints necessary for this project,
- * but can be easily extended.
+ * osu!API v2 wrapper. Only implements endpoints necessary for this project.
  */
-class OsuWrapper 
+class OsuWrapper
 {
 public:
     OsuWrapper(const int apiCooldownMs);
@@ -25,6 +20,9 @@ public:
 
     bool getRankings(Page page, Gamemode mode, nlohmann::json& rankings);
     bool getUser(UserID userID, Gamemode mode, nlohmann::json& user);
+    bool getUserBeatmapScores(Gamemode const& mode, UserID const& userID, BeatmapID const& beatmapID, nlohmann::json& userBeatmapScores /* out */);
+    bool getBeatmap(BeatmapID const& beatmapID, nlohmann::json& beatmap /* out */);
+    bool getBeatmapAttributes(BeatmapID const& beatmapID, Gamemode const& mode, OsuMods const& mods, nlohmann::json& attributes /* out */);
 
 private:
     bool makeRequest(const std::string requestURL, const CURLoption method);

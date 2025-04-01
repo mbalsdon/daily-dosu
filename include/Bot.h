@@ -2,6 +2,7 @@
 #define __BOT_H__
 
 #include "RankingsDatabaseManager.h"
+#include "TopPlaysDatabaseManager.h"
 #include "BotConfigDatabaseManager.h"
 #include "EmbedGenerator.h"
 #include "Util.h"
@@ -18,20 +19,27 @@
 const std::chrono::seconds k_cmdRateLimitPeriod = std::chrono::seconds(2);
 const std::chrono::seconds k_interactionRateLimitPeriod = std::chrono::seconds(1);
 
+const std::string k_cmdNewsletterPageOptionDesc = "Which newsletter to retrieve";
+const std::string k_cmdSubscribePageOptionDesc = "Which newsletter to subscribe to";
+const std::string k_cmdUnsubscribePageOptionDesc = "Which newsletter to unsubscribe from";
+
+const std::string k_newsletterPageOptionName = "page";
+
 /**
  * DPP wrapper for the Discord bot. All event handling logic (and nothing else) should go here.
  * Where possible, the strategy should be to build embeds/components as little as possible, opting
  * instead to save them to memory such that we save compute / disk accesses.
  */
-class Bot 
+class Bot
 {
 public:
-    Bot(const std::string& botToken, RankingsDatabaseManager& rankingsDbm, BotConfigDatabaseManager& botConfigDbm);
+    Bot(const std::string& botToken, RankingsDatabaseManager& rankingsDbm, TopPlaysDatabaseManager& topPlaysDbm, BotConfigDatabaseManager& botConfigDbm);
     ~Bot();
 
     void start();
     void stop();
     void scrapeRankingsCallback();
+    void topPlaysCallback();
 
 private:
     Bot(const Bot&) = delete;
@@ -57,10 +65,12 @@ private:
     void cmdUnsubscribe(const dpp::slashcommand_t& event);
 
     void buildStaticComponents();
-    bool buildNewsletter(const std::string countryCode, const RankRange rankRange, const Gamemode mode, dpp::message& message);
+    bool buildScrapeRankingsNewsletter(const std::string countryCode, const RankRange rankRange, const Gamemode mode, dpp::message& message);
+    bool buildTopPlaysNewsletter(std::string const& countryCode, Gamemode const& mode, dpp::message& message /* out */);
 
     dpp::cluster m_bot;
     RankingsDatabaseManager& m_rankingsDbm;
+    TopPlaysDatabaseManager& m_topPlaysDbm;
     BotConfigDatabaseManager& m_botConfigDbm;
     EmbedGenerator m_embedGenerator;
     std::atomic<bool> m_bIsInitialized;
@@ -79,6 +89,7 @@ private:
     dpp::embed m_helpEmbed;
     dpp::component m_scrapeRankingsActionRow1;
     dpp::component m_scrapeRankingsActionRow2;
+    dpp::component m_topPlaysActionRow1;
 };
 
 #endif /* __BOT_H__ */

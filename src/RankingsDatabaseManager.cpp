@@ -1,8 +1,6 @@
 #include "RankingsDatabaseManager.h"
 #include "Logger.h"
 
-#include <fstream>
-
 /**
  * Initialize RankingsDatabaseManager instance.
  */
@@ -77,14 +75,14 @@ void RankingsDatabaseManager::wipeTables()
     {
         SQLite::Transaction txn(*m_database);
 
-        for (const auto& [_, table] : k_modeToTable)
+        for (const auto& [_, table] : k_modeToRankingsTable)
         {
             m_database->exec("DELETE FROM " + table);
         }
 
         txn.commit();
     }
-    catch(const std::exception& e)
+    catch (const std::exception& e)
     {
         LOG_ERROR("Failed to wipe tables; ", e.what());
         throw;
@@ -99,7 +97,7 @@ void RankingsDatabaseManager::shiftRanks(Gamemode mode)
     std::lock_guard<std::mutex> lock(m_dbMtx);
     LOG_DEBUG("Shifting ranks for ", mode.toString(), "...");
 
-    const std::string table = k_modeToTable.at(mode);
+    const std::string table = k_modeToRankingsTable.at(mode);
     const std::string query =
         "UPDATE " + table + " "
         "SET yesterdayRank = currentRank, "
@@ -116,7 +114,7 @@ void RankingsDatabaseManager::insertRankingsUsers(std::vector<RankingsUser>& ran
     std::lock_guard<std::mutex> lock(m_dbMtx);
     LOG_DEBUG("Inserting ", rankingsUsers.size(), " rankings users into " + mode.toString() + "...");
 
-    const std::string table = k_modeToTable.at(mode);
+    const std::string table = k_modeToRankingsTable.at(mode);
 
     SQLite::Transaction txn(*m_database);
     SQLite::Statement query(*m_database,
@@ -155,7 +153,7 @@ void RankingsDatabaseManager::deleteUsersWithNullCurrentRank(Gamemode mode)
     std::lock_guard<std::mutex> lock(m_dbMtx);
     LOG_DEBUG("Removing users with NULL current rank from " + mode.toString() + "...");
 
-    const std::string table = k_modeToTable.at(mode);
+    const std::string table = k_modeToRankingsTable.at(mode);
 
     m_database->exec("DELETE FROM " + table + " WHERE currentRank IS NULL");
 }
@@ -168,13 +166,13 @@ std::vector<UserID> RankingsDatabaseManager::getUserIDsWithNullYesterdayRank(Gam
     std::lock_guard<std::mutex> lock(m_dbMtx);
     LOG_DEBUG("Finding users with NULL yesterday rank from " + mode.toString() + "...");
 
-    const std::string table = k_modeToTable.at(mode);
+    const std::string table = k_modeToRankingsTable.at(mode);
 
     std::vector<UserID> userIDs;
     SQLite::Statement query(*m_database, "SELECT userID FROM " + table + " WHERE yesterdayRank IS NULL");
     while (query.executeStep())
     {
-        userIDs.push_back(query.getColumn(0).getInt());
+        userIDs.push_back(query.getColumn(0).getInt64());
     }
 
     return userIDs;
@@ -188,7 +186,7 @@ void RankingsDatabaseManager::updateYesterdayRanks(std::vector<std::pair<UserID,
     std::lock_guard<std::mutex> lock(m_dbMtx);
     LOG_DEBUG("Updating yesterday ranks of ", userYesterdayRanks.size(), " users from " + mode.toString() + "...");
 
-    const std::string table = k_modeToTable.at(mode);
+    const std::string table = k_modeToRankingsTable.at(mode);
 
     SQLite::Transaction txn(*m_database);
     SQLite::Statement query(*m_database,
@@ -211,12 +209,12 @@ void RankingsDatabaseManager::updateYesterdayRanks(std::vector<std::pair<UserID,
 /**
  * Return true if database has an empty table, false otherwise.
  */
-bool RankingsDatabaseManager::hasEmptyRankingsTable()
+bool RankingsDatabaseManager::hasEmptyTable()
 {
     std::lock_guard<std::mutex> lock(m_dbMtx);
     LOG_DEBUG("Checking if database has empty tables...");
 
-    for (const auto& [_, table] : k_modeToTable)
+    for (const auto& [_, table] : k_modeToRankingsTable)
     {
         SQLite::Statement query(*m_database, "SELECT NOT EXISTS (SELECT 1 FROM " + table + " LIMIT 1)");
 
@@ -238,7 +236,7 @@ std::vector<RankImprovement> RankingsDatabaseManager::getTopRankImprovements(std
     std::lock_guard<std::mutex> lock(m_dbMtx);
     LOG_DEBUG("Retrieving top users by rank improvement from " + mode.toString() + "...");
 
-    std::string table = k_modeToTable.at(mode);
+    std::string table = k_modeToRankingsTable.at(mode);
 
     std::vector<RankImprovement> results;
     SQLite::Statement query(*m_database,
@@ -261,7 +259,7 @@ std::vector<RankImprovement> RankingsDatabaseManager::getTopRankImprovements(std
         "   AND currentRank >= ? "
         "   AND currentRank <= ? "
         "   AND yesterdayRank > currentRank "
-        "   AND (countryCode = ? OR ? = 'GLOBAL') "
+        "   AND (countryCode = ? OR ? = '" + k_global + "') "
         "ORDER BY (CAST(yesterdayRank - currentRank AS FLOAT) / currentRank) DESC "
         "LIMIT ?"
     );
@@ -279,7 +277,7 @@ std::vector<RankImprovement> RankingsDatabaseManager::getTopRankImprovements(std
         rankImprovement.user.username = query.getColumn(1).getString();
         rankImprovement.user.countryCode = query.getColumn(2).getString();
         rankImprovement.user.pfpLink = query.getColumn(3).getString();
-        rankImprovement.user.performancePoints = query.getColumn(4).getInt64();
+        rankImprovement.user.performancePoints = query.getColumn(4).getDouble();
         rankImprovement.user.accuracy = query.getColumn(5).getDouble();
         rankImprovement.user.hoursPlayed = query.getColumn(6).getInt64();
         rankImprovement.user.yesterdayRank = query.getColumn(7).getInt64();
@@ -301,7 +299,7 @@ std::vector<RankImprovement> RankingsDatabaseManager::getBottomRankImprovements(
     std::lock_guard<std::mutex> lock(m_dbMtx);
     LOG_DEBUG("Retrieving bottom users by rank improvement from " + mode.toString() + "...");
 
-    std::string table = k_modeToTable.at(mode);
+    std::string table = k_modeToRankingsTable.at(mode);
 
     std::vector<RankImprovement> results;
     SQLite::Statement query(*m_database,
@@ -324,7 +322,7 @@ std::vector<RankImprovement> RankingsDatabaseManager::getBottomRankImprovements(
         "   AND currentRank >= ? "
         "   AND currentRank <= ? "
         "   AND yesterdayRank < currentRank "
-        "   AND (countryCode = ? OR ? = 'GLOBAL') "
+        "   AND (countryCode = ? OR ? = '" + k_global + "') "
         "ORDER BY (CAST(currentRank - yesterdayRank AS FLOAT) / currentRank) DESC "
         "LIMIT ?"
     );
@@ -338,14 +336,14 @@ std::vector<RankImprovement> RankingsDatabaseManager::getBottomRankImprovements(
     while (query.executeStep())
     {
         RankImprovement rankImprovement;
-        rankImprovement.user.userID = query.getColumn(0).getInt();
+        rankImprovement.user.userID = query.getColumn(0).getInt64();
         rankImprovement.user.username = query.getColumn(1).getString();
         rankImprovement.user.countryCode = query.getColumn(2).getString();
         rankImprovement.user.pfpLink = query.getColumn(3).getString();
-        rankImprovement.user.performancePoints = query.getColumn(4).getInt();
+        rankImprovement.user.performancePoints = query.getColumn(4).getDouble();
         rankImprovement.user.accuracy = query.getColumn(5).getDouble();
-        rankImprovement.user.hoursPlayed = query.getColumn(6).getInt();
-        rankImprovement.user.yesterdayRank = query.getColumn(7).getInt();
+        rankImprovement.user.hoursPlayed = query.getColumn(6).getInt64();
+        rankImprovement.user.yesterdayRank = query.getColumn(7).getInt64();
         rankImprovement.user.currentRank = query.getColumn(8).getInt64();
         rankImprovement.relativeImprovement = query.getColumn(9).getDouble();
 
@@ -376,19 +374,19 @@ void RankingsDatabaseManager::createTables()
     {
         SQLite::Transaction txn(*m_database);
 
-        for (const auto& [_, table] : k_modeToTable)
+        for (const auto& [_, table] : k_modeToRankingsTable)
         {
             m_database->exec(
                 "CREATE TABLE IF NOT EXISTS " + table + " ("
-                "   userID INTEGER PRIMARY KEY, "
-                "   username TEXT NOT NULL UNIQUE, "
-                "   countryCode TEXT NOT NULL, "
-                "   pfpLink TEXT NOT NULL, "
-                "   performancePoints INTEGER NOT NULL, "
-                "   accuracy REAL NOT NULL, "
-                "   hoursPlayed INTEGER NOT NULL, "
-                "   yesterdayRank INTEGER, "
-                "   currentRank INTEGER"
+                "   userID            INTEGER  PRIMARY KEY,     "
+                "   username          TEXT     NOT NULL UNIQUE, "
+                "   countryCode       TEXT     NOT NULL,        "
+                "   pfpLink           TEXT     NOT NULL,        "
+                "   performancePoints REAL     NOT NULL,        "
+                "   accuracy          REAL     NOT NULL,        "
+                "   hoursPlayed       INTEGER  NOT NULL,        "
+                "   yesterdayRank     INTEGER,                  "
+                "   currentRank       INTEGER                   "
                 ")"
             );
         }

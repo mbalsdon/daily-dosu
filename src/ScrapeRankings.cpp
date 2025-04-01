@@ -4,6 +4,8 @@
 #include "Logger.h"
 #include "DosuConfig.h"
 
+#include <dpp/nlohmann/json.hpp>
+
 #include <filesystem>
 #include <thread>
 #include <vector>
@@ -34,7 +36,7 @@ void processRankingsUsers(
         nlohmann::json rankingsObj;
         if (!osu.getRankings(page, mode, rankingsObj))
         {
-            std::string reason = std::string("scrapeRankings - failed to get ranking IDs! page=").append(std::to_string(page)).append(", mode=").append(mode.toString());
+            std::string reason = std::string("Failed to get ranking IDs! page=").append(std::to_string(page)).append(", mode=").append(mode.toString());
             throw std::runtime_error(reason);
         }
 
@@ -80,7 +82,7 @@ void processUsers(
         UserID userID = remainingUserIDs.at(j);
         if (!osu.getUser(userID, mode, userObj))
         {
-            std::string reason = std::string("scrapeRankings - failed to get user! userID=").append(std::to_string(userID)).append(", mode=").append(mode.toString());
+            std::string reason = std::string("Failed to get user! userID=").append(std::to_string(userID)).append(", mode=").append(mode.toString());
             throw std::runtime_error(reason);
         }
         auto remainingUserRank = std::make_pair(userID, userObj.at("rank_history").at("data")[88].get<Rank>());
@@ -214,7 +216,7 @@ void scrapeRankingsMode(RankingsDatabaseManager& rankingsDbm, Gamemode mode)
 /**
  * WARNING: This script runs fast! If your system is powerful enough, you might get
  * ratelimited (but the API wrapper should deal with that).
- * 
+ *
  * Get data for current top 10000 players in each mode. If the last run was (roughly) a day ago, this
  * script will make a bit over ~800 osu!API calls. Otherwise, it will make 40,800 calls.
  */

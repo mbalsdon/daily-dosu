@@ -105,7 +105,7 @@ void TokenManager::updateAccessToken()
             }
             else
             {
-                LOG_WARN("Request failed; got CURLcode ", std::to_string(response), ". Retrying in ", k_curlTokenWaitMs, "ms...");
+                LOG_WARN("Request failed; ", curl_easy_strerror(response), ". Retrying in ", k_curlTokenWaitMs, "ms...");
                 std::this_thread::sleep_for(std::chrono::milliseconds(k_curlTokenWaitMs));
                 continue;
             }

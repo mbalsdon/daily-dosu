@@ -1,14 +1,41 @@
 - TODO
---- clean up metadata functions (use iterator or sth)
------ maybe delimit with / instead of `\n`
 
---- update to cpp20, update libraries (dpp making valgrind cry)
+--- getTopPlays
 
---- compiler optimizations ([[nodiscard]], noexcept)
+----- decouple classes from libraries ((osu&topplays&tokens)->httprequester->curl, (rdbm&bcdbm&tpdbm)->db->sqlitecpp)
+------- bot/embedgenerator newsletter-specific fns? e.g. scrapeRankingsX, topPlaysX
+----- organize files
+----- readme
+----- ctrlF
+----- COMMIT
 
---- job: highest plays today (or something)
------ https://github.com/Ameobea/osutrack-api ("Get the best plays by pp for all users in a given mode")
------ better to just grab recent tops from those w/ highest rank gain?
------ how to format output? probably Xth actionrow for swapping between "jobs" (newsletter pages)
+----- parallelize
 
---- job: anyone who broke a digit range (X reached 2 digit)
+----- clean up metadata functions (regex good enough)
+----- LOG_ERROR_THROW replace some of the arg check->runtime error throws
+----- compiler optimizations (const&, [[nodiscard]], noexcept)
+----- underscore private functions
+----- ctrlF
+----- COMMIT
+
+----- video embedding: o!rdr or doing it ourselves?
+------- doing ourselves:
+------- get scoreID: https://osu.ppy.sh/docs/index.html#get-a-user-beatmap-scores (else, try matching thru their tops/recents?)
+------- download osr (e.g. GET https://osu.ppy.sh/scores/1497268101/download , this is public but maybe try through api route https://osu.ppy.sh/docs/index.html#get-apiv2scoresscoredownload)
+------- convert to video https://github.com/Wieku/danser-go (osr to mp4?)
+------- can video be included in discord embed? else just put in raw message
+--------- be wary of workload; compress or increase ratelimit?
+
+----- test (run for few days, try from weird states, etc.)
+------- fix
+------- ctrlF
+------- COMMIT
+
+----- pushhh
+------- need to add DISCORD_BOT_STRINGS to dosu_config
+------- need to wipe rankings.db on prod since performancePoints went from int -> float
+------- need to update bot_config.db on prod since we added enabled/disabled newsletters
+
+- FUTURE
+
+--- threadpooling parallelized work

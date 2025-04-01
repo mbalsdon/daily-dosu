@@ -122,4 +122,12 @@ private:
 #define LOG_WARN(...) Logger::getInstance().log(Logger::Level::WARNING, CURRENT_LOCATION, __VA_ARGS__)
 #define LOG_ERROR(...) Logger::getInstance().log(Logger::Level::ERROR, CURRENT_LOCATION, __VA_ARGS__)
 
+#define LOG_ERROR_THROW(cond, ...) \
+    if (!(cond)) { \
+        std::ostringstream errorMessage; \
+        errorMessage << "Condition '" << #cond << "' failed. "; \
+        Logger::getInstance().log(Logger::Level::ERROR, CURRENT_LOCATION, __VA_ARGS__); \
+        throw std::runtime_error(errorMessage.str()); \
+    }
+
 #endif /* __LOGGER_H__ */

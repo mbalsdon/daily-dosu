@@ -2,10 +2,11 @@
 #include "DosuConfig.h"
 #include "DailyJob.h"
 #include "ScrapeRankings.h"
+#include "GetTopPlays.h"
 #include "Util.h"
 #include "Logger.h"
-#include "OsuWrapper.h"
 #include "RankingsDatabaseManager.h"
+#include "TopPlaysDatabaseManager.h"
 #include "BotConfigDatabaseManager.h"
 #include "TokenManager.h"
 
@@ -88,11 +89,14 @@ int main()
         RankingsDatabaseManager& rankingsDbm = RankingsDatabaseManager::getInstance();
         rankingsDbm.initialize(DosuConfig::rankingsDatabaseFilePath);
 
+        TopPlaysDatabaseManager& topPlaysDbm = TopPlaysDatabaseManager::getInstance();
+        topPlaysDbm.initialize(DosuConfig::topPlaysDatabaseFilePath);
+
         BotConfigDatabaseManager& botConfigDbm = BotConfigDatabaseManager::getInstance();
         botConfigDbm.initialize(DosuConfig::botConfigDatabaseFilePath);
 
         // Start bot
-        Bot bot(DosuConfig::discordBotToken, rankingsDbm, botConfigDbm);
+        Bot bot(DosuConfig::discordBotToken, rankingsDbm, topPlaysDbm, botConfigDbm);
         bot.start();
 
         // Start jobs
@@ -103,6 +107,14 @@ int main()
             [&bot]() { bot.scrapeRankingsCallback(); }
         );
         scrapeRankingsJob.start();
+
+        DailyJob topPlaysJob(
+            DosuConfig::topPlaysRunHour,
+            "getTopPlays",
+            [&topPlaysDbm] { getTopPlays(topPlaysDbm); },
+            [&bot]() { bot.topPlaysCallback(); }
+        );
+        topPlaysJob.start();
 
         // Wait for shutdown signal
         {
@@ -116,6 +128,7 @@ int main()
         bot.stop();
         tokenManager.cleanup();
         rankingsDbm.cleanup();
+        topPlaysDbm.cleanup();
         botConfigDbm.cleanup();
         curl_global_cleanup();
 
