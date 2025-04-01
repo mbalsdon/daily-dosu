@@ -1,6 +1,8 @@
 #ifndef __BOT_CONFIG_DATABASE_MANAGER__
 #define __BOT_CONFIG_DATABASE_MANAGER__
 
+#include <Util.h>
+
 #include <SQLiteCpp/SQLiteCpp.h>
 #include <dpp/dpp.h>
 
@@ -9,9 +11,15 @@
 #include <mutex>
 #include <vector>
 #include <atomic>
+#include <unordered_map>
+
+const std::unordered_map<std::string, std::string> k_newsletterToTableMap = {
+    { k_newsletterPageOptionScrapeRankings.second, "scrapeRankingsSub" },
+    { k_newsletterPageOptionTopPlays.second, "getTopPlaysSub" }
+};
 
 /**
- * SQLiteCpp wrapper for the BotConfig table.
+ * SQLiteCpp wrapper for bot config tables.
  */
 class BotConfigDatabaseManager
 {
@@ -25,10 +33,10 @@ public:
     void initialize(const std::filesystem::path dbFilePath);
     void cleanup();
 
-    std::vector<dpp::snowflake> getChannelIDs();
-    void addChannel(dpp::snowflake channelID);
-    void removeChannel(dpp::snowflake channelID);
-    bool channelExists(dpp::snowflake channelID);
+    std::vector<dpp::snowflake> getSubscribedChannels(std::string const& newsletterPage);
+    void addSubscription(dpp::snowflake const& channelID, std::string const& newsletterPage);
+    void removeSubscription(dpp::snowflake const& channelID, std::string const& newsletterPage);
+    bool isChannelSubscribed(dpp::snowflake const& channelID, std::string const& newsletterPage);
 
 private:
     BotConfigDatabaseManager()
@@ -44,6 +52,7 @@ private:
     BotConfigDatabaseManager& operator=(BotConfigDatabaseManager&&) = delete;
 
     void createTables();
+    bool channelExists_(dpp::snowflake const& channelID);
 
     std::unique_ptr<SQLite::Database> m_database;
     std::mutex m_dbMtx;

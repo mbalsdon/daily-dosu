@@ -6,7 +6,6 @@
 #include <SQLiteCpp/SQLiteCpp.h>
 
 #include <filesystem>
-#include <optional>
 #include <vector>
 #include <mutex>
 #include <cstdint>
@@ -14,7 +13,7 @@
 #include <atomic>
 #include <unordered_map>
 
-const std::unordered_map<Gamemode, std::string> k_modeToTable = {
+const std::unordered_map<Gamemode, std::string> k_modeToRankingsTable = {
     { Gamemode::Osu, "OsuRankings" },
     { Gamemode::Taiko, "TaikoRankings" },
     { Gamemode::Mania, "ManiaRankings" },
@@ -22,7 +21,7 @@ const std::unordered_map<Gamemode, std::string> k_modeToTable = {
 };
 
 /**
- * SQLiteCpp wrapper for the Rankings table.
+ * SQLiteCpp wrapper for rankings tables.
  */
 class RankingsDatabaseManager
 {
@@ -43,7 +42,7 @@ public:
     void deleteUsersWithNullCurrentRank(Gamemode mode);
     std::vector<UserID> getUserIDsWithNullYesterdayRank(Gamemode mode);
     void updateYesterdayRanks(std::vector<std::pair<UserID, Rank>>& userYesterdayRanks, Gamemode mode);
-    bool hasEmptyRankingsTable();
+    bool hasEmptyTable();
     std::vector<RankImprovement> getTopRankImprovements(std::string countryCode, int64_t minRank, int64_t maxRank, std::size_t numUsers, Gamemode mode);
     std::vector<RankImprovement> getBottomRankImprovements(std::string countryCode, int64_t minRank, int64_t maxRank, std::size_t numUsers, Gamemode mode);
 

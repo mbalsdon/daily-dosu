@@ -126,7 +126,7 @@ void DailyJob::runJobLoop()
 
 /**
  * WARNING: Does not account for system time changes during sleep (e.g. DST).
- * 
+ *
  * Calculate time until next run.
  */
 std::chrono::system_clock::time_point DailyJob::calculateNextRun()

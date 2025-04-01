@@ -8,12 +8,15 @@ project(${PROJECT_NAME})
 set(SOURCES
     src/main.cpp
     src/OsuWrapper.cpp
+    src/OsutrackWrapper.cpp
     src/Bot.cpp
     src/DosuConfig.cpp
     src/DailyJob.cpp
     src/ScrapeRankings.cpp
+    src/GetTopPlays.cpp
     src/RankingsDatabaseManager.cpp
     src/BotConfigDatabaseManager.cpp
+    src/TopPlaysDatabaseManager.cpp
     src/EmbedGenerator.cpp
     src/TokenManager.cpp
 )
@@ -78,7 +81,7 @@ target_link_libraries(${PROJECT_NAME}
     dl
     ${CMAKE_THREAD_LIBS_INIT}
     ${CURL_LIBRARIES}
-    ${OPENSSL_CRYPTO_LIBRARY} 
+    ${OPENSSL_CRYPTO_LIBRARY}
     ${OPENSSL_SSL_LIBRARY}
 )
 

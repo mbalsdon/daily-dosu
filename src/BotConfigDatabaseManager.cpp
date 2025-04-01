@@ -54,50 +54,73 @@ void BotConfigDatabaseManager::cleanup()
 /**
  * Get channelIDs.
  */
-std::vector<dpp::snowflake> BotConfigDatabaseManager::getChannelIDs()
+std::vector<dpp::snowflake> BotConfigDatabaseManager::getSubscribedChannels(std::string const& newsletterPage)
 {
     std::lock_guard<std::mutex> lock(m_dbMtx);
-    LOG_DEBUG("Retrieving channel IDs...");
+    LOG_DEBUG("Retrieving IDs of channels subscribed to ", newsletterPage);
 
     std::vector<dpp::snowflake> channelIDs;
-    SQLite::Statement query(*m_database, "SELECT channelID FROM BotConfig");
+    std::string table = k_newsletterToTableMap.at(newsletterPage);
+    SQLite::Statement query(*m_database, "SELECT channelID FROM BotConfig WHERE " + table + " = 1");
+
     while (query.executeStep())
     {
         int64_t channelID = query.getColumn(0).getInt64();
-        if (channelID < 0)
-        {
-            std::string reason = std::string("Invalid negative channel ID in database = ").append(std::to_string(channelID));
-            throw std::runtime_error(reason);
-        }
-
-        channelIDs.push_back(static_cast<dpp::snowflake>(static_cast<uint64_t>(channelID))); 
+        LOG_ERROR_THROW(
+            (channelID >= 0),
+            "Invalid negative channel ID in database = ", channelID
+        );
+        channelIDs.push_back(static_cast<dpp::snowflake>(static_cast<uint64_t>(channelID)));
     }
 
     return channelIDs;
 }
 
 /**
- * Add channel.
+ * Add channel subscription.
  */
-void BotConfigDatabaseManager::addChannel(dpp::snowflake channelID)
+void BotConfigDatabaseManager::addSubscription(dpp::snowflake const& channelID, std::string const& newsletterPage)
 {
     std::lock_guard<std::mutex> lock(m_dbMtx);
-    LOG_DEBUG("Adding channel with ID=", channelID.operator uint64_t());
+    LOG_DEBUG("Adding subscription for channel with ID ", channelID.operator uint64_t(), " to ", newsletterPage);
 
-    SQLite::Statement query(*m_database, "INSERT OR REPLACE INTO BotConfig (channelID) VALUES (?)");
-    query.bind(1, static_cast<int64_t>(channelID.operator uint64_t()));
-    query.exec();
+    if (channelExists_(channelID))
+    {
+        std::string table = k_newsletterToTableMap.at(newsletterPage);
+
+        SQLite::Statement updateQuery(*m_database, "UPDATE BotConfig SET " + table + " = 1 WHERE channelID = ?");
+        updateQuery.bind(1, static_cast<int64_t>(channelID.operator uint64_t()));
+
+        updateQuery.exec();
+    }
+    else
+    {
+        std::string scrapeRankingsTable = k_newsletterToTableMap.at(k_newsletterPageOptionScrapeRankings.second);
+        std::string getTopPlaysTable = k_newsletterToTableMap.at(k_newsletterPageOptionTopPlays.second);
+
+        SQLite::Statement insertQuery(*m_database,
+            "INSERT INTO BotConfig "
+            "(channelID, " + scrapeRankingsTable + ", " + getTopPlaysTable + ") "
+            "VALUES (?, ?, ?)"
+        );
+        insertQuery.bind(1, static_cast<int64_t>(channelID.operator uint64_t()));
+        insertQuery.bind(2, (newsletterPage == k_newsletterPageOptionScrapeRankings.second ? 1 : 0));
+        insertQuery.bind(3, (newsletterPage == k_newsletterPageOptionTopPlays.second ? 1 : 0));
+
+        insertQuery.exec();
+    }
 }
 
 /**
- * Remove channel.
+ * Remove channel subscription.
  */
-void BotConfigDatabaseManager::removeChannel(dpp::snowflake channelID)
+void BotConfigDatabaseManager::removeSubscription(dpp::snowflake const& channelID, std::string const& newsletterPage)
 {
     std::lock_guard<std::mutex> lock(m_dbMtx);
-    LOG_DEBUG("Removing channel with ID=", channelID.operator uint64_t());
+    LOG_DEBUG("Removing channel with ID ", channelID.operator uint64_t(), "'s subscription from ", newsletterPage);
 
-    SQLite::Statement query(*m_database, "DELETE FROM BotConfig WHERE channelID = ?");
+    std::string table = k_newsletterToTableMap.at(newsletterPage);
+    SQLite::Statement query(*m_database, "UPDATE BotConfig SET " + table + " = 0 WHERE channelID = ?");
     query.bind(1, static_cast<int64_t>(channelID.operator uint64_t()));
     query.exec();
 }
@@ -105,9 +128,27 @@ void BotConfigDatabaseManager::removeChannel(dpp::snowflake channelID)
 /**
  * Check if channel exists.
  */
-bool BotConfigDatabaseManager::channelExists(dpp::snowflake channelID)
+bool BotConfigDatabaseManager::isChannelSubscribed(dpp::snowflake const& channelID, std::string const& newsletterPage)
 {
     std::lock_guard<std::mutex> lock(m_dbMtx);
+    LOG_DEBUG("Checking if channel with ID ", channelID.operator uint64_t(), " is subscribed to ", newsletterPage);
+
+    std::string table = k_newsletterToTableMap.at(newsletterPage);
+    SQLite::Statement query(*m_database,
+        "SELECT COUNT(*) "
+        "FROM BotConfig "
+        "WHERE channelID = ? AND " + table + " = 1"
+    );
+    query.bind(1, static_cast<int64_t>(channelID.operator uint64_t()));
+    return (query.executeStep() && query.getColumn(0).getInt64() > 0);
+}
+
+/**
+ * WARNING: This function is not thread-safe!
+ * Check if channel exists.
+ */
+bool BotConfigDatabaseManager::channelExists_(dpp::snowflake const& channelID)
+{
     LOG_DEBUG("Checking if channel exists with ID ", channelID.operator uint64_t());
 
     SQLite::Statement query(*m_database, "SELECT COUNT(*) FROM BotConfig WHERE channelID = ?");
@@ -132,12 +173,14 @@ void BotConfigDatabaseManager::createTables()
     LOG_DEBUG("Creating tables...");
 
     /* Discord IDs (snowflakes) are uint64 but SQLiteCpp's largest native type is int64.
-    So this would not be a good idea, however the first 41 bits of a (Discord) snowflake 
+    So this would not be a good idea, however the first 41 bits of a (Discord) snowflake
     represent milliseconds since 01 Jan 2015). Thus a few decades will have to pass before
     this becomes problematic. */
-    m_database->exec(R"(
-        CREATE TABLE IF NOT EXISTS BotConfig (
-            channelID INTEGER PRIMARY KEY
-        )
-    )");
+    m_database->exec(
+        "CREATE TABLE IF NOT EXISTS BotConfig ("
+        "channelID INTEGER PRIMARY KEY, " +
+        k_newsletterToTableMap.at(k_newsletterPageOptionScrapeRankings.second) + " INTEGER NOT NULL, " +
+        k_newsletterToTableMap.at(k_newsletterPageOptionTopPlays.second) + " INTEGER NOT NULL"
+        ")"
+    );
 }

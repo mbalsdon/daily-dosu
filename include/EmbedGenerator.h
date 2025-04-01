@@ -19,6 +19,7 @@ const uint32_t k_helpColor = dpp::colors::rust;
 const uint32_t k_firstRangeColor = dpp::colors::gold;
 const uint32_t k_secondRangeColor = dpp::colors::silver;
 const uint32_t k_thirdRangeColor = dpp::colors::bronze;
+const uint32_t k_topPlaysColor = dpp::colors::summer_sky;
 
 /**
  * Helper class for building DPP components.
@@ -34,13 +35,21 @@ public:
 
     dpp::component scrapeRankingsActionRow1();
     dpp::component scrapeRankingsActionRow2();
+    dpp::component topPlaysActionRow1();
     dpp::interaction_modal_response scrapeRankingsFilterCountryModal();
+    dpp::interaction_modal_response topPlaysFilterCountryModal();
     dpp::interaction_modal_response scrapeRankingsFilterModeModal();
-    bool parseMetadata(const dpp::message message, EmbedMetadata& metadata);
+    dpp::interaction_modal_response topPlaysFilterModeModal();
+    bool parseScrapeRankingsMetadata(const dpp::message message, EmbedMetadata& metadata);
+    bool parseTopPlaysMetadata(dpp::message const& message, EmbedMetadata& metadata /* out */);
+
+    dpp::embed topPlaysEmbed(std::vector<TopPlay> const& topPlays, Gamemode const& mode, std::string const& countryCode);
 
 private:
-    std::string metadataTag(const std::string countryCode, const RankRange rankRange, const Gamemode mode);
+    std::string scrapeRankingsMetadataTag(const std::string countryCode, const RankRange rankRange, const Gamemode mode);
+    std::string topPlaysMetadataTag(std::string const& countryCode, Gamemode const& mode);
     void addPlayersToScrapeRankingsDescription(std::stringstream& description, std::vector<RankImprovement> players, const bool bIsTop, const Gamemode mode);
+    void addPlayersToTopPlaysDescription(std::stringstream& description, std::vector<TopPlay> const& topPlays, Gamemode const& mode);
 };
 
 #endif /* __EMBED_GENERATOR_H__ */
