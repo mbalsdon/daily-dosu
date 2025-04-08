@@ -1,62 +1,43 @@
-#include "TopPlaysDatabaseManager.h"
+#include "TopPlaysDatabase.h"
 #include "Logger.h"
 
-
 /**
- * Initialize TopPlaysDatabaseManager instance.
+ * TopPlaysDatabase constructor.
  */
-void TopPlaysDatabaseManager::initialize(const std::filesystem::path dbFilePath)
+TopPlaysDatabase::TopPlaysDatabase(std::filesystem::path const& dbFilePath)
+: m_dbFilePath(dbFilePath)
 {
-
     std::lock_guard<std::mutex> lock(m_dbMtx);
-    LOG_INFO("Initializing TopPlaysDatabaseManager (dbFilePath=", dbFilePath.string(), ")...");
-
-    if (m_bIsInitialized)
-    {
-        LOG_WARN("TopPlaysDatabaseManager is already initialized!");
-        return;
-    }
-
-    m_dbFilePath = dbFilePath;
-    m_database = std::make_unique<SQLite::Database>(dbFilePath.string(), SQLite::OPEN_READWRITE | SQLite::OPEN_CREATE);
-
-    createTables();
-    m_bIsInitialized = true;
+    LOG_DEBUG("Opening database connection for top plays; dbFilePath=", dbFilePath.string());
+    m_pDatabase = std::make_unique<SQLite::Database>(dbFilePath.string(), SQLite::OPEN_READWRITE | SQLite::OPEN_CREATE);
+    createTables_();
 }
 
 /**
- * Clean up database resources.
+ * TopPlaysDatabase destructor.
  */
-void TopPlaysDatabaseManager::cleanup()
+TopPlaysDatabase::~TopPlaysDatabase()
 {
     std::lock_guard<std::mutex> lock(m_dbMtx);
-    LOG_INFO("Cleaning up TopPlaysDatabaseManager...");
-
-    if (!m_bIsInitialized || !m_database)
-    {
-        LOG_WARN("TopPlaysDatabaseManager is not initialized!");
-        return;
-    }
-
-    if (m_database->getTotalChanges() > 0)
+    LOG_INFO("Closing database connection for top plays");
+    if (m_pDatabase->getTotalChanges() > 0)
     {
         try
         {
-            m_database->exec("COMMIT");
+            m_pDatabase->exec("COMMIT");
         }
-        catch(const SQLite::Exception& e)
+        catch(SQLite::Exception const& e)
         {}
     }
 
-    m_database.reset();
-    m_bIsInitialized = false;
+    m_pDatabase.reset();
 }
 
 /**
  * Return time of last write to database.
  * NOTE: The whole database, not a specific table!
  */
-std::filesystem::file_time_type TopPlaysDatabaseManager::lastWriteTime()
+[[nodiscard]] std::filesystem::file_time_type TopPlaysDatabase::lastWriteTime()
 {
     std::lock_guard<std::mutex> lock(m_dbMtx);
     LOG_DEBUG("Getting time of last write to database...");
@@ -67,18 +48,18 @@ std::filesystem::file_time_type TopPlaysDatabaseManager::lastWriteTime()
 /**
  * Delete all entries in tables.
  */
-void TopPlaysDatabaseManager::wipeTables()
+void TopPlaysDatabase::wipeTables()
 {
     std::lock_guard<std::mutex> lock(m_dbMtx);
     LOG_DEBUG("Wiping tables...");
 
     try
     {
-        SQLite::Transaction txn(*m_database);
+        SQLite::Transaction txn(*m_pDatabase);
 
-        for (const auto& [_, table] : k_modeToTopPlaysTable)
+        for (auto const& [_, table] : k_modeToTopPlaysTable)
         {
-            m_database->exec("DELETE FROM " + table);
+            m_pDatabase->exec("DELETE FROM " + table);
         }
 
         txn.commit();
@@ -93,14 +74,14 @@ void TopPlaysDatabaseManager::wipeTables()
 /**
  * Return true if database has an empty table, false otherwise.
  */
-bool TopPlaysDatabaseManager::hasEmptyTable()
+[[nodiscard]] bool TopPlaysDatabase::hasEmptyTable()
 {
     std::lock_guard<std::mutex> lock(m_dbMtx);
     LOG_DEBUG("Checking if database has empty tables...");
 
-    for (const auto& [_, table] : k_modeToTopPlaysTable)
+    for (auto const& [_, table] : k_modeToTopPlaysTable)
     {
-        SQLite::Statement query(*m_database, "SELECT NOT EXISTS (SELECT 1 FROM " + table + " LIMIT 1)");
+        SQLite::Statement query(*m_pDatabase, "SELECT NOT EXISTS (SELECT 1 FROM " + table + " LIMIT 1)");
 
         if (query.executeStep() && query.getColumn(0).getInt64())
         {
@@ -114,15 +95,15 @@ bool TopPlaysDatabaseManager::hasEmptyTable()
 /**
  * Perform batch insert of top plays.
  */
-void TopPlaysDatabaseManager::insertTopPlays(Gamemode const& mode, std::vector<TopPlay> const& topPlays)
+void TopPlaysDatabase::insertTopPlays(Gamemode const& mode, std::vector<TopPlay> const& topPlays)
 {
     std::lock_guard<std::mutex> lock(m_dbMtx);
     LOG_DEBUG("Inserting ", topPlays.size(), " top plays into " + mode.toString() + "...");
 
     const std::string table = k_modeToTopPlaysTable.at(mode);
 
-    SQLite::Transaction txn(*m_database);
-    SQLite::Statement query(*m_database,
+    SQLite::Transaction txn(*m_pDatabase);
+    SQLite::Statement query(*m_pDatabase,
         "INSERT INTO " + table + " "
         "("
         "rank, "
@@ -178,7 +159,7 @@ void TopPlaysDatabaseManager::insertTopPlays(Gamemode const& mode, std::vector<T
     txn.commit();
 }
 
-std::vector<TopPlay> TopPlaysDatabaseManager::getTopPlays(std::string const& countryCode, std::size_t const& numTopPlays, Gamemode const& mode)
+[[nodiscard]] std::vector<TopPlay> TopPlaysDatabase::getTopPlays(std::string const& countryCode, std::size_t const& numTopPlays, Gamemode const& mode)
 {
     std::lock_guard<std::mutex> lock(m_dbMtx);
     LOG_DEBUG("Retrieving top plays for mode ", mode.toString(), "...");
@@ -186,7 +167,7 @@ std::vector<TopPlay> TopPlaysDatabaseManager::getTopPlays(std::string const& cou
     std::string table = k_modeToTopPlaysTable.at(mode);
 
     std::vector<TopPlay> results;
-    SQLite::Statement query(*m_database,
+    SQLite::Statement query(*m_pDatabase,
         "SELECT "
         "   rank, "
         "   scoreID, mods, performancePoints, accuracy, totalScore, createdAt, combo, letterRank, count300, count100, count50, countMiss, "
@@ -245,29 +226,20 @@ std::vector<TopPlay> TopPlaysDatabaseManager::getTopPlays(std::string const& cou
 }
 
 /**
- * TopPlaysDatabaseManager destructor.
- */
-TopPlaysDatabaseManager::~TopPlaysDatabaseManager()
-{
-    LOG_DEBUG("Destructing TopPlaysDatabaseManager instance...");
-    cleanup();
-}
-
-/**
  * Create database tables if they don't exist.
  * Does not use a mutex.
  */
-void TopPlaysDatabaseManager::createTables()
+void TopPlaysDatabase::createTables_()
 {
     LOG_DEBUG("Creating tables...");
 
     try
     {
-        SQLite::Transaction txn(*m_database);
+        SQLite::Transaction txn(*m_pDatabase);
 
-        for (const auto& [_, table] : k_modeToTopPlaysTable)
+        for (auto const& [_, table] : k_modeToTopPlaysTable)
         {
-            m_database->exec(
+            m_pDatabase->exec(
                 "CREATE TABLE IF NOT EXISTS " + table + " ("
                 "   rank              INTEGER  PRIMARY KEY, "
                 "   scoreID           INTEGER  UNIQUE,      "
@@ -305,7 +277,7 @@ void TopPlaysDatabaseManager::createTables()
 
         txn.commit();
     }
-    catch(const std::exception& e)
+    catch (std::exception const& e)
     {
         LOG_ERROR("Failed to create tables; ", e.what());
         throw;

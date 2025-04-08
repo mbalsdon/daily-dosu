@@ -4,14 +4,14 @@
 #include "OsutrackWrapper.h"
 #include "OsuWrapper.h"
 
-#include <dpp/nlohmann/json.hpp>
+#include <nlohmann/json.hpp>
 
 namespace
 {
 /**
  * Get today's top plays for given mode.
  */
-void getTopPlaysMode(OsutrackWrapper& osutrack, OsuWrapper& osu, TopPlaysDatabaseManager& topPlaysDbm, ISO8601DateTimeUTC const& now, Gamemode const& mode)
+void getTopPlaysMode(OsutrackWrapper& osutrack, OsuWrapper& osu, std::shared_ptr<TopPlaysDatabase> pTopPlaysDb, ISO8601DateTimeUTC const& now, Gamemode const& mode)
 {
     // Grab the top plays
     LOG_INFO("Retrieving top ", k_numTopPlays, " ", mode.toString(), " plays from today...");
@@ -127,7 +127,7 @@ void getTopPlaysMode(OsutrackWrapper& osutrack, OsuWrapper& osu, TopPlaysDatabas
     }
 
     LOG_INFO("Populating database...");
-    topPlaysDbm.insertTopPlays(mode, topPlays);
+    pTopPlaysDb->insertTopPlays(mode, topPlays);
 }
 } /* namespace */
 
@@ -135,22 +135,20 @@ void getTopPlaysMode(OsutrackWrapper& osutrack, OsuWrapper& osu, TopPlaysDatabas
  * Get daily top plays for each mode.
  * Makes 4 osutrack API calls and up to 4*k_numTopPlays osu!API calls.
  */
-ISO8601DateTimeUTC getTopPlays(TopPlaysDatabaseManager& topPlaysDbm)
+void getTopPlays(std::shared_ptr<TokenManager> pTokenManager, std::shared_ptr<TopPlaysDatabase> pTopPlaysDb)
 {
     LOG_INFO("Grabbing top plays of the day...");
 
     OsutrackWrapper osutrack(0);
-    OsuWrapper osu(0);
+    OsuWrapper osu(pTokenManager, 0);
     ISO8601DateTimeUTC now;
 
     LOG_INFO("Wiping tables...");
-    topPlaysDbm.wipeTables();
+    pTopPlaysDb->wipeTables();
 
     // Do work for each mode
-    getTopPlaysMode(osutrack, osu, topPlaysDbm, now, Gamemode::Osu);
-    getTopPlaysMode(osutrack, osu, topPlaysDbm, now, Gamemode::Taiko);
-    getTopPlaysMode(osutrack, osu, topPlaysDbm, now, Gamemode::Mania);
-    getTopPlaysMode(osutrack, osu, topPlaysDbm, now, Gamemode::Catch);
-
-    return now;
+    getTopPlaysMode(osutrack, osu, pTopPlaysDb, now, Gamemode::Osu);
+    getTopPlaysMode(osutrack, osu, pTopPlaysDb, now, Gamemode::Taiko);
+    getTopPlaysMode(osutrack, osu, pTopPlaysDb, now, Gamemode::Mania);
+    getTopPlaysMode(osutrack, osu, pTopPlaysDb, now, Gamemode::Catch);
 }

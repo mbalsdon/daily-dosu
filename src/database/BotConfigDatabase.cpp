@@ -1,67 +1,51 @@
-#include "BotConfigDatabaseManager.h"
+#include "BotConfigDatabase.h"
 #include "Logger.h"
 
 #include <cstdint>
 
 /**
- * Initialize BotConfigDatabaseManager instance.
+ * BotConfigDatabase constructor.
  */
-void BotConfigDatabaseManager::initialize(const std::filesystem::path dbFilePath)
+BotConfigDatabase::BotConfigDatabase(std::filesystem::path const& dbFilePath)
+: m_dbFilePath(dbFilePath)
 {
     std::lock_guard<std::mutex> lock(m_dbMtx);
-    LOG_INFO("Initializing BotConfigDatabaseManager (dbFilePath=", dbFilePath.string(), ")...");
-
-    if (m_bIsInitialized)
-    {
-        LOG_WARN("BotConfigDatabaseManager is already initialized!");
-        return;
-    }
-
-    m_database = std::make_unique<SQLite::Database>(dbFilePath.string(), SQLite::OPEN_READWRITE | SQLite::OPEN_CREATE);
-
-    createTables();
-    m_bIsInitialized = true;
+    LOG_DEBUG("Opening database connection for bot config; dbFilePath=", dbFilePath.string());
+    m_pDatabase = std::make_unique<SQLite::Database>(m_dbFilePath.string(), SQLite::OPEN_READWRITE | SQLite::OPEN_CREATE);
+    createTables_();
 }
 
 /**
- * Clean up database resources.
+ * BotConfigDatabase destructor.
  */
-void BotConfigDatabaseManager::cleanup()
+BotConfigDatabase::~BotConfigDatabase()
 {
     std::lock_guard<std::mutex> lock(m_dbMtx);
-    LOG_INFO("Cleaning up BotConfigDatabaseManager...");
-
-    if (!m_bIsInitialized || !m_database)
-    {
-        LOG_WARN("BotConfigDatabaseManager is not initialized!");
-        return;
-    }
-
-    if (m_database->getTotalChanges() > 0)
+    LOG_DEBUG("Closing database connection for bot config");
+    if (m_pDatabase->getTotalChanges() > 0)
     {
         try
         {
-            m_database->exec("COMMIT");
+            m_pDatabase->exec("COMMIT");
         }
-        catch(const SQLite::Exception& e)
+        catch(SQLite::Exception const& e)
         {}
     }
 
-    m_database.reset();
-    m_bIsInitialized = false;
+    m_pDatabase.reset();
 }
 
 /**
  * Get channelIDs.
  */
-std::vector<dpp::snowflake> BotConfigDatabaseManager::getSubscribedChannels(std::string const& newsletterPage)
+std::vector<dpp::snowflake> BotConfigDatabase::getSubscribedChannels(std::string const& newsletterPage)
 {
     std::lock_guard<std::mutex> lock(m_dbMtx);
     LOG_DEBUG("Retrieving IDs of channels subscribed to ", newsletterPage);
 
     std::vector<dpp::snowflake> channelIDs;
     std::string table = k_newsletterToTableMap.at(newsletterPage);
-    SQLite::Statement query(*m_database, "SELECT channelID FROM BotConfig WHERE " + table + " = 1");
+    SQLite::Statement query(*m_pDatabase, "SELECT channelID FROM BotConfig WHERE " + table + " = 1");
 
     while (query.executeStep())
     {
@@ -79,7 +63,7 @@ std::vector<dpp::snowflake> BotConfigDatabaseManager::getSubscribedChannels(std:
 /**
  * Add channel subscription.
  */
-void BotConfigDatabaseManager::addSubscription(dpp::snowflake const& channelID, std::string const& newsletterPage)
+void BotConfigDatabase::addSubscription(dpp::snowflake const& channelID, std::string const& newsletterPage)
 {
     std::lock_guard<std::mutex> lock(m_dbMtx);
     LOG_DEBUG("Adding subscription for channel with ID ", channelID.operator uint64_t(), " to ", newsletterPage);
@@ -88,7 +72,7 @@ void BotConfigDatabaseManager::addSubscription(dpp::snowflake const& channelID, 
     {
         std::string table = k_newsletterToTableMap.at(newsletterPage);
 
-        SQLite::Statement updateQuery(*m_database, "UPDATE BotConfig SET " + table + " = 1 WHERE channelID = ?");
+        SQLite::Statement updateQuery(*m_pDatabase, "UPDATE BotConfig SET " + table + " = 1 WHERE channelID = ?");
         updateQuery.bind(1, static_cast<int64_t>(channelID.operator uint64_t()));
 
         updateQuery.exec();
@@ -98,7 +82,7 @@ void BotConfigDatabaseManager::addSubscription(dpp::snowflake const& channelID, 
         std::string scrapeRankingsTable = k_newsletterToTableMap.at(k_newsletterPageOptionScrapeRankings.second);
         std::string getTopPlaysTable = k_newsletterToTableMap.at(k_newsletterPageOptionTopPlays.second);
 
-        SQLite::Statement insertQuery(*m_database,
+        SQLite::Statement insertQuery(*m_pDatabase,
             "INSERT INTO BotConfig "
             "(channelID, " + scrapeRankingsTable + ", " + getTopPlaysTable + ") "
             "VALUES (?, ?, ?)"
@@ -114,13 +98,13 @@ void BotConfigDatabaseManager::addSubscription(dpp::snowflake const& channelID, 
 /**
  * Remove channel subscription.
  */
-void BotConfigDatabaseManager::removeSubscription(dpp::snowflake const& channelID, std::string const& newsletterPage)
+void BotConfigDatabase::removeSubscription(dpp::snowflake const& channelID, std::string const& newsletterPage)
 {
     std::lock_guard<std::mutex> lock(m_dbMtx);
     LOG_DEBUG("Removing channel with ID ", channelID.operator uint64_t(), "'s subscription from ", newsletterPage);
 
     std::string table = k_newsletterToTableMap.at(newsletterPage);
-    SQLite::Statement query(*m_database, "UPDATE BotConfig SET " + table + " = 0 WHERE channelID = ?");
+    SQLite::Statement query(*m_pDatabase, "UPDATE BotConfig SET " + table + " = 0 WHERE channelID = ?");
     query.bind(1, static_cast<int64_t>(channelID.operator uint64_t()));
     query.exec();
 }
@@ -128,13 +112,13 @@ void BotConfigDatabaseManager::removeSubscription(dpp::snowflake const& channelI
 /**
  * Check if channel exists.
  */
-bool BotConfigDatabaseManager::isChannelSubscribed(dpp::snowflake const& channelID, std::string const& newsletterPage)
+[[nodiscard]] bool BotConfigDatabase::isChannelSubscribed(dpp::snowflake const& channelID, std::string const& newsletterPage)
 {
     std::lock_guard<std::mutex> lock(m_dbMtx);
     LOG_DEBUG("Checking if channel with ID ", channelID.operator uint64_t(), " is subscribed to ", newsletterPage);
 
     std::string table = k_newsletterToTableMap.at(newsletterPage);
-    SQLite::Statement query(*m_database,
+    SQLite::Statement query(*m_pDatabase,
         "SELECT COUNT(*) "
         "FROM BotConfig "
         "WHERE channelID = ? AND " + table + " = 1"
@@ -147,28 +131,19 @@ bool BotConfigDatabaseManager::isChannelSubscribed(dpp::snowflake const& channel
  * WARNING: This function is not thread-safe!
  * Check if channel exists.
  */
-bool BotConfigDatabaseManager::channelExists_(dpp::snowflake const& channelID)
+[[nodiscard]] bool BotConfigDatabase::channelExists_(dpp::snowflake const& channelID)
 {
     LOG_DEBUG("Checking if channel exists with ID ", channelID.operator uint64_t());
 
-    SQLite::Statement query(*m_database, "SELECT COUNT(*) FROM BotConfig WHERE channelID = ?");
+    SQLite::Statement query(*m_pDatabase, "SELECT COUNT(*) FROM BotConfig WHERE channelID = ?");
     query.bind(1, static_cast<int64_t>(channelID.operator uint64_t()));
     return (query.executeStep() && query.getColumn(0).getInt64() > 0);
 }
 
 /**
- * BotConfigDatabaseManager destructor.
- */
-BotConfigDatabaseManager::~BotConfigDatabaseManager()
-{
-    LOG_DEBUG("Destructing BotConfigDatabaseManager instance...");
-    cleanup();
-}
-
-/**
  * Create database tables if they don't exist.
  */
-void BotConfigDatabaseManager::createTables()
+void BotConfigDatabase::createTables_()
 {
     LOG_DEBUG("Creating tables...");
 
@@ -176,7 +151,7 @@ void BotConfigDatabaseManager::createTables()
     So this would not be a good idea, however the first 41 bits of a (Discord) snowflake
     represent milliseconds since 01 Jan 2015). Thus a few decades will have to pass before
     this becomes problematic. */
-    m_database->exec(
+    m_pDatabase->exec(
         "CREATE TABLE IF NOT EXISTS BotConfig ("
         "channelID INTEGER PRIMARY KEY, " +
         k_newsletterToTableMap.at(k_newsletterPageOptionScrapeRankings.second) + " INTEGER NOT NULL, " +

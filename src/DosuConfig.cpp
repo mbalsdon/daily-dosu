@@ -26,7 +26,7 @@ namespace
  * Convert given hour from UTC to system timezone.
  * Thanks to the dev who put this on SO 14 years ago and thanks to Claude for feeding it to me!
  */
-int utcToLocal(int utcHour)
+[[nodiscard]] int utcToLocal(int const& utcHour) noexcept
 {
     auto now = std::chrono::system_clock::now();
     auto nowTt = std::chrono::system_clock::to_time_t(now);
@@ -61,18 +61,17 @@ int utcToLocal(int utcHour)
 /**
  * Load JSON configuration.
  */
-void DosuConfig::load(std::filesystem::path filePath)
+void DosuConfig::load(std::filesystem::path const& filePath)
 {
     LOG_DEBUG("Loading config from ", filePath);
 
     // Read file
     nlohmann::json configDataJson;
     std::ifstream inputFile(filePath);
-    if (!inputFile.is_open())
-    {
-        std::string reason = std::string("DosuConfig::load - failed to open ").append(filePath.string());
-        throw std::runtime_error(reason);
-    }
+    LOG_ERROR_THROW(
+        inputFile.is_open(),
+        "Failed to open ", filePath.string()
+    );
     inputFile >> configDataJson;
     inputFile.close();
 
@@ -107,7 +106,7 @@ void DosuConfig::load(std::filesystem::path filePath)
 /**
  * Create config from user input.
  */
-void DosuConfig::setupConfig(std::filesystem::path filePath)
+void DosuConfig::setupConfig(std::filesystem::path const& filePath)
 {
     LOG_DEBUG("Running config setup tool...");
 
@@ -144,6 +143,7 @@ void DosuConfig::setupConfig(std::filesystem::path filePath)
     defaultDiscordBotStrings[k_letterRankCKey]  = "C";
     defaultDiscordBotStrings[k_letterRankBKey]  = "B";
     defaultDiscordBotStrings[k_letterRankAKey]  = "A";
+    defaultDiscordBotStrings[k_modMRKey] = "MR";
     defaultDiscordBotStrings[k_modTPKey] = "TP";
     defaultDiscordBotStrings[k_modSDKey] = "SD";
     defaultDiscordBotStrings[k_modSOKey] = "SO";

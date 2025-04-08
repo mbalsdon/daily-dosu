@@ -16,16 +16,15 @@
 class DailyJob
 {
 public:
-    DailyJob(int hour, std::string name, std::function<void()> job, std::function<void()> jobCallback);
+    DailyJob(int const& hour, std::string const& name, std::function<void()> const& job, std::function<void()> const& jobCallback);
     ~DailyJob();
 
     void start();
     void stop();
 
 private:
-    void runJobLoop();
-    std::chrono::system_clock::time_point calculateNextRun();
-    int normalizeHour(int hour);
+    void runJobLoop_();
+    [[nodiscard]] std::chrono::system_clock::time_point calculateNextRun_() const noexcept;
 
     int m_hour;
     std::string m_name;
