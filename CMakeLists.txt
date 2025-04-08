@@ -7,18 +7,23 @@ set(CMAKE_BUILD_TYPE Debug)
 project(${PROJECT_NAME})
 set(SOURCES
     src/main.cpp
-    src/OsuWrapper.cpp
-    src/OsutrackWrapper.cpp
-    src/Bot.cpp
     src/DosuConfig.cpp
     src/DailyJob.cpp
-    src/ScrapeRankings.cpp
-    src/GetTopPlays.cpp
-    src/RankingsDatabaseManager.cpp
-    src/BotConfigDatabaseManager.cpp
-    src/TopPlaysDatabaseManager.cpp
-    src/EmbedGenerator.cpp
-    src/TokenManager.cpp
+
+    src/bot/Bot.cpp
+    src/bot/EmbedGenerator.cpp
+
+    src/database/RankingsDatabase.cpp
+    src/database/BotConfigDatabase.cpp
+    src/database/TopPlaysDatabase.cpp
+
+    src/http/OsuWrapper.cpp
+    src/http/OsutrackWrapper.cpp
+    src/http/TokenManager.cpp
+    src/http/HttpRequester.cpp
+
+    src/job/ScrapeRankings.cpp
+    src/job/GetTopPlays.cpp
 )
 
 add_executable(${PROJECT_NAME} ${SOURCES})
@@ -75,6 +80,10 @@ target_include_directories(${PROJECT_NAME} SYSTEM PUBLIC
 
 target_include_directories(${PROJECT_NAME} PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/bot
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/database
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/http
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/job
 )
 
 target_link_libraries(${PROJECT_NAME}
@@ -83,6 +92,10 @@ target_link_libraries(${PROJECT_NAME}
     ${CURL_LIBRARIES}
     ${OPENSSL_CRYPTO_LIBRARY}
     ${OPENSSL_SSL_LIBRARY}
+)
+
+target_include_directories(${PROJECT_NAME} PRIVATE
+    lib/json/include
 )
 
 add_subdirectory(lib/DPP)

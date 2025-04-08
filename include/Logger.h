@@ -13,7 +13,7 @@ struct SourceLocation
     const char* function;
     unsigned int line;
 
-    SourceLocation(const char* f, const char* fn, unsigned int l)
+    SourceLocation(const char* f, const char* fn, unsigned int const& l)
         : file(f)
         , function(fn)
         , line(l)
@@ -34,24 +34,24 @@ public:
         ERROR
     };
 
-    static Logger& getInstance()
+    [[nodiscard]] static Logger& getInstance() noexcept
     {
         static Logger instance;
         return instance;
     }
 
-    void setLogLevel(int level)
+    void setLogLevel(int const& level)
     {
-        m_logLevel = intToLevel(level);
+        m_logLevel = intToLevel_(level);
     }
 
-    void setLogLevel(Level level)
+    void setLogLevel(Level const& level)
     {
         m_logLevel = level;
     }
 
     template<typename... Args>
-    void log(Level level, const SourceLocation& location, Args&&... args)
+    void log(Level const& level, SourceLocation const& location, Args&&... args) const
     {
         if (level < m_logLevel)
         {
@@ -66,7 +66,7 @@ public:
 
         // Append prefix
         std::stringstream ss;
-        ss << "[" << levelToString(level) << "] ";
+        ss << "[" << levelToString_(level) << "] ";
         if (m_logLevel <= Level::DEBUG)
         {
             ss << "[" << std::put_time(std::localtime(&time), "%Y-%m-%d %H:%M:%S") << "." << std::setfill('0') << std::setw(3) << nowMs.count() << "] ";
@@ -84,12 +84,12 @@ public:
 
 private:
     Logger() = default;
-    Logger(const Logger&) = delete;
-    Logger& operator=(const Logger&) = delete;
+    Logger(Logger const&) = delete;
+    Logger& operator=(Logger const&) = delete;
     Logger(Logger&&) = delete;
     Logger& operator=(Logger&&) = delete;
 
-    static const char* levelToString(Level level)
+    [[nodiscard]] static const char* levelToString_(Level const& level) noexcept
     {
         switch (level)
         {
@@ -101,7 +101,7 @@ private:
         }
     }
 
-    static Level intToLevel(int l)
+    [[nodiscard]] static Level intToLevel_(int const& l) noexcept
     {
         switch (l)
         {

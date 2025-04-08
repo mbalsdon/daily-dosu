@@ -16,26 +16,27 @@
 #include <regex>
 #include <iomanip>
 #include <vector>
+#include <optional>
 
 /* - - - - - - Constants - - - - - - - */
 
-const int k_curlRetryWaitMs = 30000;
+constexpr int k_curlRetryWaitMs = 30000;
 
-static constexpr std::size_t k_getRankingIDMaxNumIDs = 50;
-static constexpr std::size_t k_getRankingIDMaxPage = 200;
+constexpr std::size_t k_getRankingIDMaxNumIDs = 50;
+constexpr std::size_t k_getRankingIDMaxPage = 200;
 
-static constexpr std::size_t k_numDisplayUsersTop = 15;
-static constexpr std::size_t k_numDisplayUsersBottom = 5;
-const std::size_t k_numDisplayUsers = std::max(k_numDisplayUsersTop, k_numDisplayUsersBottom);
+constexpr std::size_t k_numDisplayUsersTop = 15;
+constexpr std::size_t k_numDisplayUsersBottom = 5;
+constexpr std::size_t k_numDisplayUsers = std::max(k_numDisplayUsersTop, k_numDisplayUsersBottom);
 
-static constexpr std::size_t k_numTopPlays = 100;
-static constexpr std::size_t k_numDisplayTopPlays = 5;
+constexpr std::size_t k_numTopPlays = 100;
+constexpr std::size_t k_numDisplayTopPlays = 5;
 
 const std::string k_defaultDate = "0000-00-00T00:00:00Z";
 
-const std::chrono::hours k_minValidScrapeRankingsHour = std::chrono::hours(22);
-const std::chrono::hours k_maxValidScrapeRankingsHour = std::chrono::hours(26);
-const std::chrono::hours k_maxValidTopPlaysHour = std::chrono::hours(26);
+constexpr std::chrono::hours k_minValidScrapeRankingsHour = std::chrono::hours(22);
+constexpr std::chrono::hours k_maxValidScrapeRankingsHour = std::chrono::hours(26);
+constexpr std::chrono::hours k_maxValidTopPlaysHour = std::chrono::hours(26);
 
 const std::filesystem::path k_rootDir = std::filesystem::path(__FILE__).parent_path().parent_path();
 const std::filesystem::path k_dosuConfigFilePath = k_rootDir / "dosu_config.json";
@@ -85,7 +86,7 @@ public:
     /**
      * Assumes input is all uppercase.
      */
-    [[nodiscard]] static std::string_view toAlpha2(std::string_view const input) noexcept
+    [[nodiscard]] static std::string_view toAlpha2(std::string_view const& input) noexcept
     {
         if (input.length() == 2)
         {
@@ -134,7 +135,7 @@ public:
     /**
      * Constructs using the current time.
      */
-    ISO8601DateTimeUTC()
+    ISO8601DateTimeUTC() noexcept
     {
         auto now = std::chrono::system_clock::now();
         auto nowTt = std::chrono::system_clock::to_time_t(now);
@@ -172,7 +173,7 @@ public:
         m_second = std::stoi(matches[6]);
     }
 
-    std::string toString() const
+    [[nodiscard]] std::string toString() const
     {
         std::ostringstream oss;
         oss << std::setfill('0')
@@ -188,7 +189,7 @@ public:
     /**
      * YYYY-MM-DD
      */
-    std::string toDateString() const
+    [[nodiscard]] std::string toDateString() const
     {
         std::ostringstream oss;
         oss << std::setfill('0')
@@ -198,7 +199,7 @@ public:
         return oss.str();
     }
 
-    uint64_t toEpochTime() const
+    [[nodiscard]] uint64_t toEpochTime() const
     {
         std::tm timeinfo = {};
         timeinfo.tm_year = m_year - 1900;
@@ -216,7 +217,7 @@ public:
         #endif
     }
 
-    bool operator==(const ISO8601DateTimeUTC& other) const
+    [[nodiscard]] bool operator==(ISO8601DateTimeUTC const& other) const noexcept
     {
         return ((m_year == other.m_year) &&
                 (m_month == other.m_month) &&
@@ -273,14 +274,26 @@ public:
         Third
     };
 
-    RankRange() : m_value(Value::First) {}
-    RankRange(Value v) : m_value(v) {}
-    RankRange(int i) : m_value(static_cast<Value>(i)) {}
+    RankRange() noexcept : m_value(Value::First) {}
+    RankRange(Value v) noexcept : m_value(v) {}
+    RankRange(int i) noexcept : m_value(static_cast<Value>(i)) {}
+    RankRange(RankRange const& other) noexcept : m_value(other.m_value) {}
 
-    bool operator==(const RankRange& other) const { return m_value == other.m_value; }
-    bool operator==(Value v) const { return m_value == v; }
+    ~RankRange() = default;
 
-    std::string toString() const
+    [[nodiscard]] bool operator==(RankRange const& other) const noexcept { return m_value == other.m_value; }
+    [[nodiscard]] bool operator==(Value const& v) const noexcept { return m_value == v; }
+
+    RankRange& operator=(RankRange const& other)
+    {
+        if (this != &other)
+        {
+            m_value = other.m_value;
+        }
+        return *this;
+    }
+
+    [[nodiscard]] std::string toString() const noexcept
     {
         switch (m_value)
         {
@@ -291,26 +304,30 @@ public:
         }
     }
 
-    int toInt() const
+    [[nodiscard]] int toInt() const noexcept
     {
         return static_cast<int>(m_value);
     }
 
-    std::pair<int64_t, int64_t> toRange() const
+    [[nodiscard]] std::pair<int64_t, int64_t> toRange() const noexcept
     {
         switch (m_value)
         {
-        case Value::First: return std::make_pair(1, 100);
-        case Value::Second: return std::make_pair(101, 1000);
-        case Value::Third: return std::make_pair(1001, 10000);
-        default: return std::make_pair(0, 10000);
+        case Value::First: return mk_firstRange;
+        case Value::Second: return mk_secondRange;
+        case Value::Third: return mk_thirdRange;
+        default: return mk_firstRange;
         }
     }
 
-    Value getValue() const { return m_value; }
+    [[nodiscard]] Value getValue() const noexcept { return m_value; }
 
 private:
     Value m_value;
+
+    const std::pair<int64_t, int64_t> mk_firstRange = std::make_pair(1, 100);
+    const std::pair<int64_t, int64_t> mk_secondRange = std::make_pair(101, 1000);
+    const std::pair<int64_t, int64_t> mk_thirdRange = std::make_pair(1001, 10000);
 };
 
 class Gamemode
@@ -324,16 +341,16 @@ public:
         Catch
     };
 
-    Gamemode() : m_mode(Mode::Osu) {}
-    Gamemode(Mode m) : m_mode(m) {}
-    Gamemode(int i) : m_mode(static_cast<Mode>(i)) {}
+    Gamemode() noexcept : m_mode(Mode::Osu) {}
+    Gamemode(Mode m) noexcept : m_mode(m) {}
+    Gamemode(int i) noexcept : m_mode(static_cast<Mode>(i)) {}
 
-    bool operator==(const Gamemode& other) const { return m_mode == other.m_mode; }
-    bool operator==(Mode m) const { return m_mode == m; }
-    bool operator!=(const Gamemode& other) const { return m_mode != other.m_mode; }
-    bool operator!=(Mode m) const { return m_mode != m; }
+    [[nodiscard]] bool operator==(Gamemode const& other) const noexcept { return m_mode == other.m_mode; }
+    [[nodiscard]] bool operator==(Mode m) const noexcept { return m_mode == m; }
+    [[nodiscard]] bool operator!=(Gamemode const& other) const noexcept { return m_mode != other.m_mode; }
+    [[nodiscard]] bool operator!=(Mode m) const noexcept { return m_mode != m; }
 
-    std::string toString() const
+    [[nodiscard]] std::string toString() const noexcept
     {
         switch (m_mode)
         {
@@ -345,12 +362,12 @@ public:
         }
     }
 
-    int toInt() const
+    [[nodiscard]] int toInt() const noexcept
     {
         return static_cast<int>(m_mode);
     }
 
-    int toOsutrackInt() const
+    [[nodiscard]] int toOsutrackInt() const noexcept
     {
         switch (m_mode)
         {
@@ -362,7 +379,7 @@ public:
         }
     }
 
-    static bool fromString(const std::string s, Gamemode& mode)
+    static bool fromString(std::string const& s, Gamemode& mode /* out */) noexcept
     {
         std::string sl = s;
         std::transform(sl.begin(), sl.end(), sl.begin(), ::tolower);
@@ -391,12 +408,12 @@ public:
         return false;
     }
 
-    static Mode fromInt(const int i)
+    [[nodiscard]] static Mode fromInt(int const& i) noexcept
     {
         return static_cast<Mode>(i);
     }
 
-    Mode getMode() const { return m_mode; }
+    [[nodiscard]] Mode getMode() const noexcept { return m_mode; }
 
 private:
     Mode m_mode;
@@ -407,7 +424,7 @@ namespace std
 template<>
 struct hash<Gamemode>
 {
-    size_t operator()(const Gamemode& gm) const
+    [[nodiscard]] size_t operator()(Gamemode const& gm) const noexcept
     {
         return hash<int>()(gm.toInt());
     }
@@ -417,21 +434,101 @@ struct hash<Gamemode>
 class EmbedMetadata
 {
 public:
-    EmbedMetadata()
-    : m_countryCode(k_global)
-    , m_rankRange(RankRange())
-    , m_gamemode(Gamemode())
+    EmbedMetadata() = default;
+
+    EmbedMetadata(
+        std::optional<std::string> const& countryCode,
+        std::optional<RankRange> const& rankRange,
+        std::optional<Gamemode> const& gamemode) noexcept
+    : m_oCountryCode(countryCode)
+    , m_oRankRange(rankRange)
+    , m_oGamemode(gamemode)
     {}
 
-    EmbedMetadata(std::string countryCode, RankRange rankRange, Gamemode gamemode)
-    : m_countryCode(countryCode)
-    , m_rankRange(rankRange)
-    , m_gamemode(gamemode)
+    EmbedMetadata(std::string const& metadataString)
+    {
+        std::smatch matches;
+
+        std::regex countryRegex = toRegex_(mk_countryKey);
+        std::regex rankRangeRegex = toRegex_(mk_rankRangeKey);
+        std::regex gamemodeRegex = toRegex_(mk_gamemodeKey);
+
+        if ((std::regex_search(metadataString, matches, countryRegex)) && (matches.size() > 1))
+        {
+            m_oCountryCode = matches[1].str();
+        }
+        if ((std::regex_search(metadataString, matches, rankRangeRegex)) && (matches.size() > 1))
+        {
+            m_oRankRange = RankRange(std::stoi(matches[1].str()) - 1);
+        }
+        if ((std::regex_search(metadataString, matches, gamemodeRegex)) && (matches.size() > 1))
+        {
+            Gamemode gm;
+            std::string lower = matches[1].str();
+            std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
+            Gamemode::fromString(lower, gm);
+            m_oGamemode = gm;
+        }
+    }
+
+    EmbedMetadata(EmbedMetadata const& other) noexcept
+    : m_oCountryCode(other.m_oCountryCode)
+    , m_oRankRange(other.m_oRankRange)
+    , m_oGamemode(other.m_oGamemode)
     {}
 
-    std::string m_countryCode;
-    RankRange m_rankRange;
-    Gamemode m_gamemode;
+    ~EmbedMetadata() = default;
+
+    EmbedMetadata& operator=(EmbedMetadata const& other) noexcept
+    {
+        if (this != &other)
+        {
+            m_oCountryCode = other.m_oCountryCode;
+            m_oRankRange = other.m_oRankRange;
+            m_oGamemode = other.m_oGamemode;
+        }
+        return *this;
+    }
+
+    [[nodiscard]] std::string getCountryCode() const noexcept { return (m_oCountryCode.has_value() ? m_oCountryCode.value() : k_global); }
+    [[nodiscard]] RankRange getRankRange() const noexcept { return (m_oRankRange.has_value() ? m_oRankRange.value() : RankRange()); }
+    [[nodiscard]] Gamemode getGamemode() const noexcept { return (m_oGamemode.has_value() ? m_oGamemode.value() : Gamemode()); }
+
+    [[nodiscard]] std::string toEmbedString() const
+    {
+        std::string ret = "";
+
+        if (m_oCountryCode.has_value())
+        {
+            ret += toTag_(mk_countryKey, m_oCountryCode.value());
+        }
+        if (m_oRankRange.has_value())
+        {
+            if (!ret.empty()) ret += "\n";
+            ret += toTag_(mk_rankRangeKey, std::to_string(m_oRankRange.value().toInt() + 1));
+        }
+        if (m_oGamemode.has_value())
+        {
+            if (!ret.empty()) ret += "\n";
+            std::string upper = m_oGamemode.value().toString();
+            std::transform(upper.begin(), upper.end(), upper.begin(), ::toupper);
+            ret += toTag_(mk_gamemodeKey, upper);
+        }
+
+        return ret;
+    }
+
+private:
+    std::optional<std::string> m_oCountryCode = std::nullopt;
+    std::optional<RankRange> m_oRankRange = std::nullopt;
+    std::optional<Gamemode> m_oGamemode = std::nullopt;
+
+    std::string const mk_countryKey = "COUNTRY";
+    std::string const mk_rankRangeKey = "RANGE";
+    std::string const mk_gamemodeKey = "GAMEMODE";
+
+    [[nodiscard]] std::string toTag_(std::string const& key, std::string const& val) const noexcept { return "`" + key + ": " + val + "`"; }
+    [[nodiscard]] std::regex toRegex_(std::string const& key) const noexcept { return std::regex("`" + key + ": (.*)`"); }
 };
 
 class OsuMods
@@ -439,14 +536,14 @@ class OsuMods
 public:
     OsuMods() = delete;
     ~OsuMods() = default;
-    bool operator==(const OsuMods& other) const { return m_mods == other.m_mods; }
+    [[nodiscard]] bool operator==(OsuMods const& other) const noexcept { return m_mods == other.m_mods; }
 
-    OsuMods(std::vector<std::string> mods)
+    OsuMods(std::vector<std::string> const& mods) noexcept
     {
         m_mods = mods;
     }
 
-    OsuMods(std::string modsStr)
+    OsuMods(std::string const& modsStr)
     {
         if (modsStr.length() % 2 != 0)
         {
@@ -466,7 +563,7 @@ public:
         }
     }
 
-    std::string toString() const
+    [[nodiscard]] std::string toString() const noexcept
     {
         std::string ret = "";
         for (std::string const& modStr : m_mods)
@@ -476,12 +573,12 @@ public:
         return ret;
     }
 
-    std::vector<std::string> get() const
+    [[nodiscard]] std::vector<std::string> get() const noexcept
     {
         return m_mods;
     }
 
-    bool isNomod()
+    [[nodiscard]] bool isNomod() const noexcept
     {
         return m_mods.empty();
     }
@@ -523,7 +620,7 @@ struct RankingsUser
     Rank yesterdayRank = -1;
     Rank currentRank = -1;
 
-    bool isValid() const
+    [[nodiscard]] bool isValid() const noexcept
     {
         return (
             (userID > 0) &&
@@ -581,7 +678,7 @@ struct TopPlay
     int64_t rank = -1;
     Score score = {};
 
-    bool isValid() const
+    [[nodiscard]] bool isValid() const
     {
         return (
             (rank > 0) &&

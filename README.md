@@ -40,14 +40,15 @@ If you find any bugs or want to request a feature, feel free to open an [issue](
 
 ## Internals
 
-Core functionality can mainly be found in the following places:
-- **ScrapeRankings** - script that fetches user data for the top 10,000 osu! players.
+Core functionality can be found in the following places:
+- **DosuConfig** - wraps the system configuration (`dosu_config.json`).
 - **DailyJob** - implements a simple 24-hour job scheduler.
-- **Bot** - DPP wrapper that handles all user-facing logic.
-- **RankingsDatabaseManager** - SQLiteCpp wrapper for storing user data.
-- **BotConfigDatabaseManager** - SQLiteCpp wrapper for storing Discord server configs (set by users).
+- **bot/** - handling for all user-facing discord bot logic.
+- **database/** - classes for storing persistent data.
+- **http/** - classes for sending out HTTP requests, e.g. to the osu! API.
+- **job/** - scripts meant to be run daily.
 
-Currently, `ScrapeRankings` is the only "big" job that is undertaken. It is registered along with a callback from `Bot` as a `DailyJob`, thus the flow of execution is roughly:
-- Scheduler wakes up and runs `scrapeRankings`, which stores its results on disk.
-- On completion, `scrapeRankingsCallback` runs, which loads the results from disk and formats them for Discord.
+Daily jobs are registered at the top level (in `main.cpp`). Let's take `scrapeRankings` for example - we register it as a daily job along with a callback from `Bot`. Each day:
+- The scheduler wakes up and runs `scrapeRankings`, which stores its results on disk.
+- On completion, `Bot::scrapeRankingsCallback` runs, which loads the results from disk and formats them for Discord.
 - Results are sent to any subscribed chat channels.

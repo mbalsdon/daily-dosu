@@ -1,61 +1,43 @@
-#include "RankingsDatabaseManager.h"
+#include "RankingsDatabase.h"
 #include "Logger.h"
 
 /**
- * Initialize RankingsDatabaseManager instance.
+ * RankingsDatabase constructor.
  */
-void RankingsDatabaseManager::initialize(const std::filesystem::path dbFilePath)
+RankingsDatabase::RankingsDatabase(std::filesystem::path const& dbFilePath)
+: m_dbFilePath(dbFilePath)
 {
-
     std::lock_guard<std::mutex> lock(m_dbMtx);
-    LOG_INFO("Initializing RankingsDatabaseManager (dbFilePath=", dbFilePath.string(), ")...");
-
-    if (m_bIsInitialized)
-    {
-        LOG_WARN("RankingsDatabaseManager is already initialized!");
-        return;
-    }
-
-    m_dbFilePath = dbFilePath;
-    m_database = std::make_unique<SQLite::Database>(dbFilePath.string(), SQLite::OPEN_READWRITE | SQLite::OPEN_CREATE);
-
-    createTables();
-    m_bIsInitialized = true;
+    LOG_DEBUG("Opening database connection for rankings; dbFilePath=", dbFilePath.string());
+    m_pDatabase = std::make_unique<SQLite::Database>(dbFilePath.string(), SQLite::OPEN_READWRITE | SQLite::OPEN_CREATE);
+    createTables_();
 }
 
 /**
- * Clean up database resources.
+ * RankingsDatabase destructor.
  */
-void RankingsDatabaseManager::cleanup()
+RankingsDatabase::~RankingsDatabase()
 {
     std::lock_guard<std::mutex> lock(m_dbMtx);
-    LOG_INFO("Cleaning up RankingsDatabaseManager (m_dbFilePath=", m_dbFilePath.string(), ")...");
-
-    if (!m_bIsInitialized || !m_database)
-    {
-        LOG_WARN("RankingsDatabaseManager is not initialized!");
-        return;
-    }
-
-    if (m_database->getTotalChanges() > 0)
+    LOG_DEBUG("Closing database connection for rankings");
+    if (m_pDatabase->getTotalChanges() > 0)
     {
         try
         {
-            m_database->exec("COMMIT");
+            m_pDatabase->exec("COMMIT");
         }
-        catch(const SQLite::Exception& e)
+        catch(SQLite::Exception const& e)
         {}
     }
 
-    m_database.reset();
-    m_bIsInitialized = false;
+    m_pDatabase.reset();
 }
 
 /**
  * Return time of last write to database.
  * NOTE: The whole database, not a specific table!
  */
-std::filesystem::file_time_type RankingsDatabaseManager::lastWriteTime()
+[[nodiscard]] std::filesystem::file_time_type RankingsDatabase::lastWriteTime()
 {
     std::lock_guard<std::mutex> lock(m_dbMtx);
     LOG_DEBUG("Getting time of last write to database...");
@@ -66,23 +48,23 @@ std::filesystem::file_time_type RankingsDatabaseManager::lastWriteTime()
 /**
  * Delete all entries in tables.
  */
-void RankingsDatabaseManager::wipeTables()
+void RankingsDatabase::wipeTables()
 {
     std::lock_guard<std::mutex> lock(m_dbMtx);
     LOG_DEBUG("Wiping tables...");
 
     try
     {
-        SQLite::Transaction txn(*m_database);
+        SQLite::Transaction txn(*m_pDatabase);
 
-        for (const auto& [_, table] : k_modeToRankingsTable)
+        for (auto const& [_, table] : k_modeToRankingsTable)
         {
-            m_database->exec("DELETE FROM " + table);
+            m_pDatabase->exec("DELETE FROM " + table);
         }
 
         txn.commit();
     }
-    catch (const std::exception& e)
+    catch (std::exception const& e)
     {
         LOG_ERROR("Failed to wipe tables; ", e.what());
         throw;
@@ -92,7 +74,7 @@ void RankingsDatabaseManager::wipeTables()
 /**
  * Clear yesterday's ranks and move current ranks into their place.
  */
-void RankingsDatabaseManager::shiftRanks(Gamemode mode)
+void RankingsDatabase::shiftRanks(Gamemode const& mode)
 {
     std::lock_guard<std::mutex> lock(m_dbMtx);
     LOG_DEBUG("Shifting ranks for ", mode.toString(), "...");
@@ -103,28 +85,28 @@ void RankingsDatabaseManager::shiftRanks(Gamemode mode)
         "SET yesterdayRank = currentRank, "
         "currentRank = NULL;";
 
-    m_database->exec(query);
+    m_pDatabase->exec(query);
 }
 
 /**
  * Perform batch insert of users.
  */
-void RankingsDatabaseManager::insertRankingsUsers(std::vector<RankingsUser>& rankingsUsers, Gamemode mode)
+void RankingsDatabase::insertRankingsUsers(std::vector<RankingsUser> const& rankingsUsers, Gamemode const& mode)
 {
     std::lock_guard<std::mutex> lock(m_dbMtx);
     LOG_DEBUG("Inserting ", rankingsUsers.size(), " rankings users into " + mode.toString() + "...");
 
     const std::string table = k_modeToRankingsTable.at(mode);
 
-    SQLite::Transaction txn(*m_database);
-    SQLite::Statement query(*m_database,
+    SQLite::Transaction txn(*m_pDatabase);
+    SQLite::Statement query(*m_pDatabase,
         "INSERT OR REPLACE INTO " + table + " "
         "(userID, username, countryCode, pfpLink, performancePoints, accuracy, hoursPlayed, currentRank, yesterdayRank) "
         "SELECT ?, ?, ?, ?, ?, ?, ?, ?, "
         "   (SELECT yesterdayRank FROM " + table + " WHERE userID = ?)"
     );
 
-    for (const auto& rankingsUser : rankingsUsers)
+    for (auto const& rankingsUser : rankingsUsers)
     {
         if (rankingsUser.isValid())
         {
@@ -148,20 +130,20 @@ void RankingsDatabaseManager::insertRankingsUsers(std::vector<RankingsUser>& ran
 /**
  * Remove users with NULL currentRank.
  */
-void RankingsDatabaseManager::deleteUsersWithNullCurrentRank(Gamemode mode)
+void RankingsDatabase::deleteUsersWithNullCurrentRank(Gamemode const& mode)
 {
     std::lock_guard<std::mutex> lock(m_dbMtx);
     LOG_DEBUG("Removing users with NULL current rank from " + mode.toString() + "...");
 
     const std::string table = k_modeToRankingsTable.at(mode);
 
-    m_database->exec("DELETE FROM " + table + " WHERE currentRank IS NULL");
+    m_pDatabase->exec("DELETE FROM " + table + " WHERE currentRank IS NULL");
 }
 
 /**
  * Get userIDs with NULL yesterdayRank.
  */
-std::vector<UserID> RankingsDatabaseManager::getUserIDsWithNullYesterdayRank(Gamemode mode)
+[[nodiscard]] std::vector<UserID> RankingsDatabase::getUserIDsWithNullYesterdayRank(Gamemode const& mode)
 {
     std::lock_guard<std::mutex> lock(m_dbMtx);
     LOG_DEBUG("Finding users with NULL yesterday rank from " + mode.toString() + "...");
@@ -169,7 +151,7 @@ std::vector<UserID> RankingsDatabaseManager::getUserIDsWithNullYesterdayRank(Gam
     const std::string table = k_modeToRankingsTable.at(mode);
 
     std::vector<UserID> userIDs;
-    SQLite::Statement query(*m_database, "SELECT userID FROM " + table + " WHERE yesterdayRank IS NULL");
+    SQLite::Statement query(*m_pDatabase, "SELECT userID FROM " + table + " WHERE yesterdayRank IS NULL");
     while (query.executeStep())
     {
         userIDs.push_back(query.getColumn(0).getInt64());
@@ -181,21 +163,21 @@ std::vector<UserID> RankingsDatabaseManager::getUserIDsWithNullYesterdayRank(Gam
 /**
  * Update yesterdayRank values.
  */
-void RankingsDatabaseManager::updateYesterdayRanks(std::vector<std::pair<UserID, Rank>>& userYesterdayRanks, Gamemode mode)
+void RankingsDatabase::updateYesterdayRanks(std::vector<std::pair<UserID, Rank>> const& userYesterdayRanks, Gamemode const& mode)
 {
     std::lock_guard<std::mutex> lock(m_dbMtx);
     LOG_DEBUG("Updating yesterday ranks of ", userYesterdayRanks.size(), " users from " + mode.toString() + "...");
 
     const std::string table = k_modeToRankingsTable.at(mode);
 
-    SQLite::Transaction txn(*m_database);
-    SQLite::Statement query(*m_database,
+    SQLite::Transaction txn(*m_pDatabase);
+    SQLite::Statement query(*m_pDatabase,
         "UPDATE " + table + " "
         "SET yesterdayRank = ? "
         "WHERE userID = ?"
     );
 
-    for (const auto& userYesterdayRank : userYesterdayRanks)
+    for (auto const& userYesterdayRank : userYesterdayRanks)
     {
         query.reset();
         query.bind(1, userYesterdayRank.second);
@@ -209,14 +191,14 @@ void RankingsDatabaseManager::updateYesterdayRanks(std::vector<std::pair<UserID,
 /**
  * Return true if database has an empty table, false otherwise.
  */
-bool RankingsDatabaseManager::hasEmptyTable()
+[[nodiscard]] bool RankingsDatabase::hasEmptyTable()
 {
     std::lock_guard<std::mutex> lock(m_dbMtx);
     LOG_DEBUG("Checking if database has empty tables...");
 
-    for (const auto& [_, table] : k_modeToRankingsTable)
+    for (auto const& [_, table] : k_modeToRankingsTable)
     {
-        SQLite::Statement query(*m_database, "SELECT NOT EXISTS (SELECT 1 FROM " + table + " LIMIT 1)");
+        SQLite::Statement query(*m_pDatabase, "SELECT NOT EXISTS (SELECT 1 FROM " + table + " LIMIT 1)");
 
         if (query.executeStep() && query.getColumn(0).getInt64())
         {
@@ -231,7 +213,12 @@ bool RankingsDatabaseManager::hasEmptyTable()
  * Get top users sorted by relative rank improvement.
  * Entering "GLOBAL" for countryCode means no filter.
  */
-std::vector<RankImprovement> RankingsDatabaseManager::getTopRankImprovements(std::string countryCode, int64_t minRank, int64_t maxRank, std::size_t numUsers, Gamemode mode)
+[[nodiscard]] std::vector<RankImprovement> RankingsDatabase::getTopRankImprovements(
+    std::string const& countryCode,
+    int64_t const& minRank,
+    int64_t const& maxRank,
+    std::size_t const& numUsers,
+    Gamemode const& mode)
 {
     std::lock_guard<std::mutex> lock(m_dbMtx);
     LOG_DEBUG("Retrieving top users by rank improvement from " + mode.toString() + "...");
@@ -239,7 +226,7 @@ std::vector<RankImprovement> RankingsDatabaseManager::getTopRankImprovements(std
     std::string table = k_modeToRankingsTable.at(mode);
 
     std::vector<RankImprovement> results;
-    SQLite::Statement query(*m_database,
+    SQLite::Statement query(*m_pDatabase,
         "SELECT "
         "   userID, "
         "   username, "
@@ -294,7 +281,12 @@ std::vector<RankImprovement> RankingsDatabaseManager::getTopRankImprovements(std
  * Get bottom users sorted by relative rank improvement.
  * Entering "GLOBAL" for countryCode means no filter.
  */
-std::vector<RankImprovement> RankingsDatabaseManager::getBottomRankImprovements(std::string countryCode, int64_t minRank, int64_t maxRank, std::size_t numUsers, Gamemode mode)
+[[nodiscard]] std::vector<RankImprovement> RankingsDatabase::getBottomRankImprovements(
+    std::string const& countryCode,
+    int64_t const& minRank,
+    int64_t const& maxRank,
+    std::size_t const& numUsers,
+    Gamemode const& mode)
 {
     std::lock_guard<std::mutex> lock(m_dbMtx);
     LOG_DEBUG("Retrieving bottom users by rank improvement from " + mode.toString() + "...");
@@ -302,7 +294,7 @@ std::vector<RankImprovement> RankingsDatabaseManager::getBottomRankImprovements(
     std::string table = k_modeToRankingsTable.at(mode);
 
     std::vector<RankImprovement> results;
-    SQLite::Statement query(*m_database,
+    SQLite::Statement query(*m_pDatabase,
         "SELECT "
         "   userID, "
         "   username, "
@@ -354,29 +346,20 @@ std::vector<RankImprovement> RankingsDatabaseManager::getBottomRankImprovements(
 }
 
 /**
- * RankingsDatabaseManager destructor.
- */
-RankingsDatabaseManager::~RankingsDatabaseManager()
-{
-    LOG_DEBUG("Destructing RankingsDatabaseManager instance...");
-    cleanup();
-}
-
-/**
  * Create database tables if they don't exist.
  * Does not use a mutex.
  */
-void RankingsDatabaseManager::createTables()
+void RankingsDatabase::createTables_()
 {
     LOG_DEBUG("Creating tables...");
 
     try
     {
-        SQLite::Transaction txn(*m_database);
+        SQLite::Transaction txn(*m_pDatabase);
 
-        for (const auto& [_, table] : k_modeToRankingsTable)
+        for (auto const& [_, table] : k_modeToRankingsTable)
         {
-            m_database->exec(
+            m_pDatabase->exec(
                 "CREATE TABLE IF NOT EXISTS " + table + " ("
                 "   userID            INTEGER  PRIMARY KEY,     "
                 "   username          TEXT     NOT NULL UNIQUE, "
@@ -393,7 +376,7 @@ void RankingsDatabaseManager::createTables()
 
         txn.commit();
     }
-    catch(const std::exception& e)
+    catch (std::exception const& e)
     {
         LOG_ERROR("Failed to create tables; ", e.what());
         throw;

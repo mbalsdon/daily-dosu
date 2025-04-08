@@ -5,9 +5,9 @@
 #include "GetTopPlays.h"
 #include "Util.h"
 #include "Logger.h"
-#include "RankingsDatabaseManager.h"
-#include "TopPlaysDatabaseManager.h"
-#include "BotConfigDatabaseManager.h"
+#include "RankingsDatabase.h"
+#include "TopPlaysDatabase.h"
+#include "BotConfigDatabase.h"
 #include "TokenManager.h"
 
 #include <curl/curl.h>
@@ -17,6 +17,7 @@
 #include <chrono>
 #include <atomic>
 #include <csignal>
+#include <memory>
 #include <condition_variable>
 
 namespace
@@ -28,7 +29,7 @@ namespace
     /**
      * Handle basic signals.
      */
-    void signalHandler(int signum)
+    void signalHandler(int signum) noexcept
     {
         if (signum == SIGINT || signum == SIGTERM)
         {
@@ -40,7 +41,7 @@ namespace
     /**
      * Set up program behaviour for signals.
      */
-    void setupSignalHandling()
+    void setupSignalHandling() noexcept
     {
         struct sigaction sa;
         sa.sa_handler = signalHandler; // Route signals
@@ -57,7 +58,7 @@ namespace
 /**
  * Entrypoint.
  */
-int main()
+int main() noexcept
 {
     try
     {
@@ -79,42 +80,41 @@ int main()
         }
         DosuConfig::load(k_dosuConfigFilePath);
 
-        // Initialize services
+        // Initialize libcurl
         curl_global_init(CURL_GLOBAL_ALL);
+
+        // Initialize logger
         Logger::getInstance().setLogLevel(DosuConfig::logLevel);
 
-        TokenManager& tokenManager = TokenManager::getInstance();
-        tokenManager.initialize(DosuConfig::osuClientID, DosuConfig::osuClientSecret);
+        // Initialize token manager
+        std::shared_ptr<TokenManager> pTokenManager = std::make_shared<TokenManager>(DosuConfig::osuClientID, DosuConfig::osuClientSecret);
 
-        RankingsDatabaseManager& rankingsDbm = RankingsDatabaseManager::getInstance();
-        rankingsDbm.initialize(DosuConfig::rankingsDatabaseFilePath);
+        // Connect to databases
+        std::shared_ptr<RankingsDatabase> pRankingsDatabase = std::make_shared<RankingsDatabase>(DosuConfig::rankingsDatabaseFilePath);
+        std::shared_ptr<TopPlaysDatabase> pTopPlaysDatabase = std::make_shared<TopPlaysDatabase>(DosuConfig::topPlaysDatabaseFilePath);
+        std::shared_ptr<BotConfigDatabase> pBotConfigDatabase = std::make_shared<BotConfigDatabase>(DosuConfig::botConfigDatabaseFilePath);
 
-        TopPlaysDatabaseManager& topPlaysDbm = TopPlaysDatabaseManager::getInstance();
-        topPlaysDbm.initialize(DosuConfig::topPlaysDatabaseFilePath);
+        // Initialize and start bot
+        std::shared_ptr<Bot> pBot = std::make_shared<Bot>(DosuConfig::discordBotToken, pRankingsDatabase, pTopPlaysDatabase, pBotConfigDatabase);
+        pBot->start();
 
-        BotConfigDatabaseManager& botConfigDbm = BotConfigDatabaseManager::getInstance();
-        botConfigDbm.initialize(DosuConfig::botConfigDatabaseFilePath);
-
-        // Start bot
-        Bot bot(DosuConfig::discordBotToken, rankingsDbm, topPlaysDbm, botConfigDbm);
-        bot.start();
-
-        // Start jobs
-        DailyJob scrapeRankingsJob(
+        // Initialize jobs
+        std::unique_ptr<DailyJob> scrapeRankingsJob = std::make_unique<DailyJob>(
             DosuConfig::scrapeRankingsRunHour,
             "scrapeRankings",
-            [&rankingsDbm] { scrapeRankings(rankingsDbm); },
-            [&bot]() { bot.scrapeRankingsCallback(); }
+            [&pTokenManager, &pRankingsDatabase] { scrapeRankings(pTokenManager, pRankingsDatabase); },
+            [&pBot]() { pBot->scrapeRankingsCallback(); }
         );
-        scrapeRankingsJob.start();
-
-        DailyJob topPlaysJob(
+        std::unique_ptr<DailyJob> topPlaysJob = std::make_unique<DailyJob>(
             DosuConfig::topPlaysRunHour,
             "getTopPlays",
-            [&topPlaysDbm] { getTopPlays(topPlaysDbm); },
-            [&bot]() { bot.topPlaysCallback(); }
+            [&pTokenManager, &pTopPlaysDatabase] { getTopPlays(pTokenManager, pTopPlaysDatabase); },
+            [&pBot]() { pBot->topPlaysCallback(); }
         );
-        topPlaysJob.start();
+
+        // Start jobs
+        scrapeRankingsJob->start();
+        topPlaysJob->start();
 
         // Wait for shutdown signal
         {
@@ -124,19 +124,14 @@ int main()
 
         // Clean everything up
         LOG_INFO("Cleaning up resources and connections - PLEASE DON'T SHUT DOWN...");
-        scrapeRankingsJob.stop();
-        bot.stop();
-        tokenManager.cleanup();
-        rankingsDbm.cleanup();
-        topPlaysDbm.cleanup();
-        botConfigDbm.cleanup();
+        scrapeRankingsJob->stop();
+        topPlaysJob->stop();
+        pBot->stop();
         curl_global_cleanup();
 
-        LOG_INFO("Cleanup complete! Exiting...");
-        Logger::getInstance().setLogLevel(Logger::Level::ERROR); // Quiet destructor logs; we already cleaned
         return 0;
     }
-    catch (const std::exception& e)
+    catch (std::exception const& e)
     {
         LOG_ERROR("Fatal error: ", e.what());
         return 1;

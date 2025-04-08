@@ -25,6 +25,7 @@ const std::string k_letterRankCKey  = "LETTER_RANK_C";
 const std::string k_letterRankBKey  = "LETTER_RANK_B";
 const std::string k_letterRankAKey  = "LETTER_RANK_A";
 
+const std::string k_modMRKey = "MOD_MR";
 const std::string k_modTPKey = "MOD_TP";
 const std::string k_modSDKey = "MOD_SD";
 const std::string k_modSOKey = "MOD_SO";
@@ -53,7 +54,6 @@ const std::string k_modEZKey = "MOD_EZ";
 const std::string k_modDTKey = "MOD_DT";
 const std::string k_modCMKey = "MOD_CM";
 const std::string k_modATKey = "MOD_AT";
-// k_modSDKey
 
 /**
  * Environment variable handler. Loads into memory to save a few disk reads.
@@ -61,8 +61,8 @@ const std::string k_modATKey = "MOD_AT";
 class DosuConfig
 {
 public:
-    static void load(std::filesystem::path filePath);
-    static void setupConfig(std::filesystem::path filePath);
+    static void load(std::filesystem::path const& filePath);
+    static void setupConfig(std::filesystem::path const& filePath);
 
     static int logLevel;
     static std::string discordBotToken;

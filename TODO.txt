@@ -2,21 +2,13 @@
 
 --- getTopPlays
 
------ decouple classes from libraries ((osu&topplays&tokens)->httprequester->curl, (rdbm&bcdbm&tpdbm)->db->sqlitecpp)
-------- bot/embedgenerator newsletter-specific fns? e.g. scrapeRankingsX, topPlaysX
------ organize files
------ readme
------ ctrlF
------ COMMIT
+----- filter by mods
+------- change OsuMods underlying to set?
+------- do the full apispam for only top numDisplay plays, calling only getUserBeatmapScores for the rest?
+--------- allows us to grab a lot more top plays
 
 ----- parallelize
-
------ clean up metadata functions (regex good enough)
------ LOG_ERROR_THROW replace some of the arg check->runtime error throws
------ compiler optimizations (const&, [[nodiscard]], noexcept)
------ underscore private functions
------ ctrlF
------ COMMIT
+----- ctrlF, commit
 
 ----- video embedding: o!rdr or doing it ourselves?
 ------- doing ourselves:
@@ -26,10 +18,11 @@
 ------- can video be included in discord embed? else just put in raw message
 --------- be wary of workload; compress or increase ratelimit?
 
+----- readme
+
 ----- test (run for few days, try from weird states, etc.)
-------- fix
-------- ctrlF
-------- COMMIT
+------- fix if needed
+------- ctrlF, commit
 
 ----- pushhh
 ------- need to add DISCORD_BOT_STRINGS to dosu_config
@@ -39,3 +32,5 @@
 - FUTURE
 
 --- threadpooling parallelized work
+
+--- new job: username changes in top X players

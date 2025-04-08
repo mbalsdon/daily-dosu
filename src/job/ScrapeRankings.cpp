@@ -2,9 +2,8 @@
 #include "OsuWrapper.h"
 #include "Util.h"
 #include "Logger.h"
-#include "DosuConfig.h"
 
-#include <dpp/nlohmann/json.hpp>
+#include <nlohmann/json.hpp>
 
 #include <filesystem>
 #include <thread>
@@ -22,23 +21,23 @@ namespace
  * Get rankings user for given range and mode, pushing them to the shared vector.
  */
 void processRankingsUsers(
-    std::vector<RankingsUser>& rankingsUsers,
+    std::vector<RankingsUser>& rankingsUsers /* out */,
     std::mutex& rankingsMtx,
-    std::size_t start,
-    std::size_t end,
-    Gamemode mode)
+    std::shared_ptr<TokenManager> pTokenManager,
+    std::size_t const& start,
+    std::size_t const& end,
+    Gamemode const& mode)
 {
     LOG_INFO("Executing thread ", std::this_thread::get_id(), " for pages ", start, "-", end - 1, " for mode ", mode.toString(), "...");
     std::vector<RankingsUser> rankingsUsersChunk;
-    OsuWrapper osu(0);
+    OsuWrapper osu(pTokenManager, 0);
     for (Page page = start; page < end; ++page)
     {
         nlohmann::json rankingsObj;
-        if (!osu.getRankings(page, mode, rankingsObj))
-        {
-            std::string reason = std::string("Failed to get ranking IDs! page=").append(std::to_string(page)).append(", mode=").append(mode.toString());
-            throw std::runtime_error(reason);
-        }
+        LOG_ERROR_THROW(
+            osu.getRankings(page, mode, rankingsObj),
+            "Failed to get ranking IDs! page=", page, ", mode=", mode.toString()
+        );
 
         nlohmann::json rankings = rankingsObj["ranking"];
         for (auto const& userStatistics : rankings)
@@ -66,25 +65,25 @@ void processRankingsUsers(
  * Get users for given range and push them to the shared vector.
  */
 void processUsers(
-    std::vector<std::pair<UserID, Rank>>& remainingUserRanks,
-    std::vector<UserID>& remainingUserIDs,
+    std::vector<std::pair<UserID, Rank>>& remainingUserRanks /* out */,
+    std::vector<UserID> const& remainingUserIDs,
     std::mutex& usersMtx,
-    std::size_t start,
-    std::size_t end,
-    Gamemode mode)
+    std::shared_ptr<TokenManager> pTokenManager,
+    std::size_t const& start,
+    std::size_t const& end,
+    Gamemode const& mode)
 {
     LOG_INFO("Executing thread ", std::this_thread::get_id(), " for ", end - start, " users, for mode ", mode.toString(), "...");
     std::vector<std::pair<UserID, Rank>> remainingUserRanksChunk;
-    OsuWrapper osu(0);
+    OsuWrapper osu(pTokenManager, 0);
     for (std::size_t j = start; j < end; ++j)
     {
         nlohmann::json userObj;
         UserID userID = remainingUserIDs.at(j);
-        if (!osu.getUser(userID, mode, userObj))
-        {
-            std::string reason = std::string("Failed to get user! userID=").append(std::to_string(userID)).append(", mode=").append(mode.toString());
-            throw std::runtime_error(reason);
-        }
+        LOG_ERROR_THROW(
+            osu.getUser(userID, mode, userObj),
+            "Failed to get user! userID=", userID, ", mode=", mode.toString()
+        );
         auto remainingUserRank = std::make_pair(userID, userObj.at("rank_history").at("data")[88].get<Rank>());
         remainingUserRanksChunk.push_back(remainingUserRank);
     }
@@ -97,11 +96,11 @@ void processUsers(
 /**
  * Get data for current top 10000 players for given mode.
  */
-void scrapeRankingsMode(RankingsDatabaseManager& rankingsDbm, Gamemode mode)
+void scrapeRankingsMode(std::shared_ptr<TokenManager> pTokenManager, std::shared_ptr<RankingsDatabase> pRankingsDb, Gamemode const& mode)
 {
     // Shift current rank to yesterday for any existing players
     LOG_INFO("Shifting ", mode.toString(), " player current rank values to yesterday...");
-    rankingsDbm.shiftRanks(mode);
+    pRankingsDb->shiftRanks(mode);
 
     // Get current top 10,000 players and update database with them
     std::vector<RankingsUser> rankingsUsers;
@@ -139,6 +138,7 @@ void scrapeRankingsMode(RankingsDatabaseManager& rankingsDbm, Gamemode mode)
             processRankingsUsers,
             std::ref(rankingsUsers),
             std::ref(rankingsMtx),
+            std::ref(pTokenManager),
             startIdx,
             endIdx,
             mode);
@@ -152,15 +152,15 @@ void scrapeRankingsMode(RankingsDatabaseManager& rankingsDbm, Gamemode mode)
 
     // Dump to database
     LOG_INFO("Dumping ", mode.toString(), " player data to database...");
-    rankingsDbm.insertRankingsUsers(rankingsUsers, mode);
+    pRankingsDb->insertRankingsUsers(rankingsUsers, mode);
 
     // Remove any entry with null currentRank (means they dropped out of top 10k)
     LOG_INFO("Removing ", mode.toString(), " players that dropped out of top 10k...");
-    rankingsDbm.deleteUsersWithNullCurrentRank(mode);
+    pRankingsDb->deleteUsersWithNullCurrentRank(mode);
 
     // Fill in yesterdayRank for rows where it is NULL (means they entered top 10k)
     LOG_INFO("Filling in data for ", mode.toString(), " players that entered top 10k...");
-    std::vector<UserID> remainingUserIDs = rankingsDbm.getUserIDsWithNullYesterdayRank(mode);
+    std::vector<UserID> remainingUserIDs = pRankingsDb->getUserIDsWithNullYesterdayRank(mode);
     std::size_t numRemainingUsers = remainingUserIDs.size();
 
     std::vector<std::pair<UserID, Rank>> remainingUserRanks;
@@ -196,6 +196,7 @@ void scrapeRankingsMode(RankingsDatabaseManager& rankingsDbm, Gamemode mode)
             std::ref(remainingUserRanks),
             std::ref(remainingUserIDs),
             std::ref(usersMtx),
+            std::ref(pTokenManager),
             startIdx,
             endIdx,
             mode);
@@ -209,7 +210,7 @@ void scrapeRankingsMode(RankingsDatabaseManager& rankingsDbm, Gamemode mode)
 
     // Dump to database
     LOG_INFO("Updating ", mode.toString(), " database with new player yesterday rank values...");
-    rankingsDbm.updateYesterdayRanks(remainingUserRanks, mode);
+    pRankingsDb->updateYesterdayRanks(remainingUserRanks, mode);
 }
 } /* namespace */
 
@@ -220,23 +221,23 @@ void scrapeRankingsMode(RankingsDatabaseManager& rankingsDbm, Gamemode mode)
  * Get data for current top 10000 players in each mode. If the last run was (roughly) a day ago, this
  * script will make a bit over ~800 osu!API calls. Otherwise, it will make 40,800 calls.
  */
-void scrapeRankings(RankingsDatabaseManager& rankingsDbm)
+void scrapeRankings(std::shared_ptr<TokenManager> pTokenManager, std::shared_ptr<RankingsDatabase> pRankingsDb)
 {
     LOG_INFO("Scraping osu! rankings...");
 
     // If last run was not roughly a day ago, wipe everything
-    auto lastWriteTime = rankingsDbm.lastWriteTime();
+    auto lastWriteTime = pRankingsDb->lastWriteTime();
     auto now = std::filesystem::file_time_type::clock::now();
     std::chrono::hours ageHours = std::chrono::duration_cast<std::chrono::hours>(now - lastWriteTime);
     if ((ageHours < k_minValidScrapeRankingsHour) || (ageHours > k_maxValidScrapeRankingsHour))
     {
         LOG_WARN("Database is out of sync with current time of running; starting from scratch...");
-        rankingsDbm.wipeTables();
+        pRankingsDb->wipeTables();
     }
 
     // Do work for each mode
-    scrapeRankingsMode(rankingsDbm, Gamemode::Osu);
-    scrapeRankingsMode(rankingsDbm, Gamemode::Taiko);
-    scrapeRankingsMode(rankingsDbm, Gamemode::Mania);
-    scrapeRankingsMode(rankingsDbm, Gamemode::Catch);
+    scrapeRankingsMode(pTokenManager, pRankingsDb, Gamemode::Osu);
+    scrapeRankingsMode(pTokenManager, pRankingsDb, Gamemode::Taiko);
+    scrapeRankingsMode(pTokenManager, pRankingsDb, Gamemode::Mania);
+    scrapeRankingsMode(pTokenManager, pRankingsDb, Gamemode::Catch);
 }
