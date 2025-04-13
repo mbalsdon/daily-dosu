@@ -40,7 +40,7 @@ TopPlaysDatabase::~TopPlaysDatabase()
 [[nodiscard]] std::filesystem::file_time_type TopPlaysDatabase::lastWriteTime()
 {
     std::lock_guard<std::mutex> lock(m_dbMtx);
-    LOG_DEBUG("Getting time of last write to database...");
+    LOG_DEBUG("Getting time of last write to database");
 
     return std::filesystem::last_write_time(m_dbFilePath);
 }
@@ -51,7 +51,7 @@ TopPlaysDatabase::~TopPlaysDatabase()
 void TopPlaysDatabase::wipeTables()
 {
     std::lock_guard<std::mutex> lock(m_dbMtx);
-    LOG_DEBUG("Wiping tables...");
+    LOG_DEBUG("Wiping tables");
 
     try
     {
@@ -77,7 +77,7 @@ void TopPlaysDatabase::wipeTables()
 [[nodiscard]] bool TopPlaysDatabase::hasEmptyTable()
 {
     std::lock_guard<std::mutex> lock(m_dbMtx);
-    LOG_DEBUG("Checking if database has empty tables...");
+    LOG_DEBUG("Checking if database has empty tables");
 
     for (auto const& [_, table] : k_modeToTopPlaysTable)
     {
@@ -98,7 +98,7 @@ void TopPlaysDatabase::wipeTables()
 void TopPlaysDatabase::insertTopPlays(Gamemode const& mode, std::vector<TopPlay> const& topPlays)
 {
     std::lock_guard<std::mutex> lock(m_dbMtx);
-    LOG_DEBUG("Inserting ", topPlays.size(), " top plays into " + mode.toString() + "...");
+    LOG_DEBUG("Inserting ", topPlays.size(), " top plays into ", mode.toString());
 
     const std::string table = k_modeToTopPlaysTable.at(mode);
 
@@ -159,10 +159,10 @@ void TopPlaysDatabase::insertTopPlays(Gamemode const& mode, std::vector<TopPlay>
     txn.commit();
 }
 
-[[nodiscard]] std::vector<TopPlay> TopPlaysDatabase::getTopPlays(std::string const& countryCode, std::size_t const& numTopPlays, Gamemode const& mode)
+[[nodiscard]] std::vector<TopPlay> TopPlaysDatabase::getTopPlays(std::string const& countryCode, std::size_t const& numTopPlays, Gamemode const& mode, std::string const& mods)
 {
     std::lock_guard<std::mutex> lock(m_dbMtx);
-    LOG_DEBUG("Retrieving top plays for mode ", mode.toString(), "...");
+    LOG_DEBUG("Retrieving top plays for mode ", mode.toString());
 
     std::string table = k_modeToTopPlaysTable.at(mode);
 
@@ -174,14 +174,18 @@ void TopPlaysDatabase::insertTopPlays(Gamemode const& mode, std::vector<TopPlay>
         "   beatmapID, beatmapStarRating, beatmapDifficultyName, beatmapArtist, beatmapTitle, mapsetCreator, beatmapMaxCombo, "
         "   userID, username, userCountryCode, userPfpLink, userPerformancePoints, userAccuracy, userHoursPlayed, userCurrentRank "
         "FROM " + table + " "
-        "WHERE (userCountryCode = ? OR ? = '" + k_global + "') "
+        "WHERE "
+        "   (userCountryCode = ? OR ? = '" + k_global + "') "
+        "   AND (mods = ? OR ? = '" + k_allMods + "') "
         "ORDER BY rank ASC "
         "LIMIT ?"
     );
 
     query.bind(1, countryCode);
     query.bind(2, countryCode);
-    query.bind(3, static_cast<int64_t>(numTopPlays));
+    query.bind(3, mods);
+    query.bind(4, mods);
+    query.bind(5, static_cast<int64_t>(numTopPlays));
 
     while (query.executeStep())
     {
@@ -231,7 +235,7 @@ void TopPlaysDatabase::insertTopPlays(Gamemode const& mode, std::vector<TopPlay>
  */
 void TopPlaysDatabase::createTables_()
 {
-    LOG_DEBUG("Creating tables...");
+    LOG_DEBUG("Creating tables");
 
     try
     {

@@ -17,6 +17,7 @@
 #include <iomanip>
 #include <vector>
 #include <optional>
+#include <set>
 
 /* - - - - - - Constants - - - - - - - */
 
@@ -29,7 +30,7 @@ constexpr std::size_t k_numDisplayUsersTop = 15;
 constexpr std::size_t k_numDisplayUsersBottom = 5;
 constexpr std::size_t k_numDisplayUsers = std::max(k_numDisplayUsersTop, k_numDisplayUsersBottom);
 
-constexpr std::size_t k_numTopPlays = 100;
+constexpr std::size_t k_numTopPlays = 1000;
 constexpr std::size_t k_numDisplayTopPlays = 5;
 
 const std::string k_defaultDate = "0000-00-00T00:00:00Z";
@@ -68,6 +69,9 @@ const std::string k_scrapeRankingsResetAllButtonID = "sr_reset_all_button";
 const std::string k_topPlaysFilterCountryButtonID = "tp_filter_country_button";
 const std::string k_topPlaysFilterCountryModalID = "tp_filter_country_modal";
 const std::string k_topPlaysFilterCountryTextInputID = "tp_filter_country_text_input";
+const std::string k_topPlaysFilterModsButtonID = "tp_filter_mods_button";
+const std::string k_topPlaysFilterModsModalID = "tp_filter_mods_modal";
+const std::string k_topPlaysFilterModsTextInputID = "tp_filter_mods_text_input";
 const std::string k_topPlaysSelectModeButtonID = "tp_select_mode_button";
 const std::string k_topPlaysSelectModeModalID = "tp_select_mode_modal";
 const std::string k_topPlaysSelectModeTextInputID = "tp_select_mode_text_input";
@@ -77,6 +81,7 @@ const std::pair<std::string, std::string> k_newsletterPageOptionScrapeRankings =
 const std::pair<std::string, std::string> k_newsletterPageOptionTopPlays = std::make_pair("Top Plays", "Top Plays");
 
 const std::string k_global = "GLOBAL";
+const std::string k_allMods = "ALL";
 
 /* - - - - - - - - Types - - - - - - - */
 
@@ -431,6 +436,86 @@ struct hash<Gamemode>
 };
 } /* namespace std */
 
+class OsuMods
+{
+public:
+    OsuMods() = delete;
+    ~OsuMods() = default;
+    [[nodiscard]] bool operator==(OsuMods const& other) const noexcept { return m_mods == other.m_mods; }
+
+    OsuMods(std::set<std::string> const& mods) noexcept
+    {
+        for (auto const& modsStr : mods)
+        {
+            verifyModsStr_(modsStr);
+        }
+        m_mods = mods;
+    }
+
+    OsuMods(std::vector<std::string> const& modsVect) noexcept
+    {
+        for (auto const& modsStr : modsVect)
+        {
+            verifyModsStr_(modsStr);
+        }
+        m_mods.insert(modsVect.begin(), modsVect.end());
+    }
+
+    OsuMods(std::string const& modsStr)
+    {
+        if (modsStr == k_allMods)
+        {
+            m_mods.insert(modsStr);
+            return;
+        }
+
+        verifyModsStr_(modsStr);
+
+        for (std::size_t i = 0; i < modsStr.length(); i += 2)
+        {
+            m_mods.insert(modsStr.substr(i, 2));
+        }
+    }
+
+    [[nodiscard]] std::string toString() const noexcept
+    {
+        std::string ret = "";
+        for (std::string const& modStr : m_mods)
+        {
+            ret += modStr;
+        }
+        return ret;
+    }
+
+    [[nodiscard]] std::set<std::string> get() const noexcept
+    {
+        return m_mods;
+    }
+
+    [[nodiscard]] bool isNomod() const noexcept
+    {
+        return m_mods.empty();
+    }
+
+private:
+    void verifyModsStr_(std::string const& modsStr)
+    {
+        if (modsStr.length() % 2 != 0)
+        {
+            std::string reason = "Input string has an uneven number of characters! modsStr=" + modsStr;
+            throw std::invalid_argument(reason);
+        }
+
+        if (!std::all_of(modsStr.begin(), modsStr.end(), [](char c) { return std::isalpha(c) && std::isupper(c); }))
+        {
+            std::string reason = "Input string must contain only uppercase alphabetical characters! modsStr=" + modsStr;
+            throw std::invalid_argument(reason);
+        }
+    }
+
+    std::set<std::string> m_mods = {};
+};
+
 class EmbedMetadata
 {
 public:
@@ -439,10 +524,12 @@ public:
     EmbedMetadata(
         std::optional<std::string> const& countryCode,
         std::optional<RankRange> const& rankRange,
-        std::optional<Gamemode> const& gamemode) noexcept
+        std::optional<Gamemode> const& gamemode,
+        std::optional<OsuMods> const& mods) noexcept
     : m_oCountryCode(countryCode)
     , m_oRankRange(rankRange)
     , m_oGamemode(gamemode)
+    , m_oMods(mods)
     {}
 
     EmbedMetadata(std::string const& metadataString)
@@ -452,6 +539,7 @@ public:
         std::regex countryRegex = toRegex_(mk_countryKey);
         std::regex rankRangeRegex = toRegex_(mk_rankRangeKey);
         std::regex gamemodeRegex = toRegex_(mk_gamemodeKey);
+        std::regex modsRegex = toRegex_(mk_modsKey);
 
         if ((std::regex_search(metadataString, matches, countryRegex)) && (matches.size() > 1))
         {
@@ -469,12 +557,17 @@ public:
             Gamemode::fromString(lower, gm);
             m_oGamemode = gm;
         }
+        if ((std::regex_search(metadataString, matches, modsRegex)) && (matches.size() > 1))
+        {
+            m_oMods = OsuMods(matches[1].str());
+        }
     }
 
     EmbedMetadata(EmbedMetadata const& other) noexcept
     : m_oCountryCode(other.m_oCountryCode)
     , m_oRankRange(other.m_oRankRange)
     , m_oGamemode(other.m_oGamemode)
+    , m_oMods(other.m_oMods)
     {}
 
     ~EmbedMetadata() = default;
@@ -486,6 +579,7 @@ public:
             m_oCountryCode = other.m_oCountryCode;
             m_oRankRange = other.m_oRankRange;
             m_oGamemode = other.m_oGamemode;
+            m_oMods = other.m_oMods;
         }
         return *this;
     }
@@ -493,6 +587,7 @@ public:
     [[nodiscard]] std::string getCountryCode() const noexcept { return (m_oCountryCode.has_value() ? m_oCountryCode.value() : k_global); }
     [[nodiscard]] RankRange getRankRange() const noexcept { return (m_oRankRange.has_value() ? m_oRankRange.value() : RankRange()); }
     [[nodiscard]] Gamemode getGamemode() const noexcept { return (m_oGamemode.has_value() ? m_oGamemode.value() : Gamemode()); }
+    [[nodiscard]] OsuMods getMods() const noexcept { return (m_oMods.has_value() ? m_oMods.value() : k_allMods); }
 
     [[nodiscard]] std::string toEmbedString() const
     {
@@ -514,6 +609,11 @@ public:
             std::transform(upper.begin(), upper.end(), upper.begin(), ::toupper);
             ret += toTag_(mk_gamemodeKey, upper);
         }
+        if (m_oMods.has_value())
+        {
+            if (!ret.empty()) ret += "\n";
+            ret += toTag_(mk_modsKey, m_oMods.value().toString());
+        }
 
         return ret;
     }
@@ -522,69 +622,15 @@ private:
     std::optional<std::string> m_oCountryCode = std::nullopt;
     std::optional<RankRange> m_oRankRange = std::nullopt;
     std::optional<Gamemode> m_oGamemode = std::nullopt;
+    std::optional<OsuMods> m_oMods = std::nullopt;
 
     std::string const mk_countryKey = "COUNTRY";
     std::string const mk_rankRangeKey = "RANGE";
     std::string const mk_gamemodeKey = "GAMEMODE";
+    std::string const mk_modsKey = "MODS";
 
     [[nodiscard]] std::string toTag_(std::string const& key, std::string const& val) const noexcept { return "`" + key + ": " + val + "`"; }
     [[nodiscard]] std::regex toRegex_(std::string const& key) const noexcept { return std::regex("`" + key + ": (.*)`"); }
-};
-
-class OsuMods
-{
-public:
-    OsuMods() = delete;
-    ~OsuMods() = default;
-    [[nodiscard]] bool operator==(OsuMods const& other) const noexcept { return m_mods == other.m_mods; }
-
-    OsuMods(std::vector<std::string> const& mods) noexcept
-    {
-        m_mods = mods;
-    }
-
-    OsuMods(std::string const& modsStr)
-    {
-        if (modsStr.length() % 2 != 0)
-        {
-            std::string reason = "Input string has an uneven number of characters! modsStr=" + modsStr;
-            throw std::invalid_argument(reason);
-        }
-
-        if (!std::all_of(modsStr.begin(), modsStr.end(), [](char c) { return std::isalpha(c) && std::isupper(c); }))
-        {
-            std::string reason = "Input string must contain only uppercase alphabetical characters! modsStr=" + modsStr;
-            throw std::invalid_argument(reason);
-        }
-
-        for (std::size_t i = 0; i < modsStr.length(); i += 2)
-        {
-            m_mods.push_back(modsStr.substr(i, 2));
-        }
-    }
-
-    [[nodiscard]] std::string toString() const noexcept
-    {
-        std::string ret = "";
-        for (std::string const& modStr : m_mods)
-        {
-            ret += modStr;
-        }
-        return ret;
-    }
-
-    [[nodiscard]] std::vector<std::string> get() const noexcept
-    {
-        return m_mods;
-    }
-
-    [[nodiscard]] bool isNomod() const noexcept
-    {
-        return m_mods.empty();
-    }
-
-private:
-    std::vector<std::string> m_mods = {};
 };
 
 typedef std::size_t Page;

@@ -62,7 +62,7 @@ private:
 
     void buildStaticComponents_();
     [[nodiscard]] bool buildScrapeRankingsNewsletter_(std::string const& countryCode, RankRange const& rankRange, Gamemode const& mode, dpp::message& message /* out */);
-    [[nodiscard]] bool buildTopPlaysNewsletter_(std::string const& countryCode, Gamemode const& mode, dpp::message& message /* out */);
+    [[nodiscard]] bool buildTopPlaysNewsletter_(std::string const& countryCode, Gamemode const& mode, std::string const& mods, dpp::message& message /* out */);
 
     dpp::cluster m_bot;
     std::unique_ptr<EmbedGenerator> m_pEmbedGenerator = std::make_unique<EmbedGenerator>();

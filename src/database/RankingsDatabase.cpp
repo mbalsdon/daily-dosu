@@ -40,7 +40,7 @@ RankingsDatabase::~RankingsDatabase()
 [[nodiscard]] std::filesystem::file_time_type RankingsDatabase::lastWriteTime()
 {
     std::lock_guard<std::mutex> lock(m_dbMtx);
-    LOG_DEBUG("Getting time of last write to database...");
+    LOG_DEBUG("Getting time of last write to database");
 
     return std::filesystem::last_write_time(m_dbFilePath);
 }
@@ -51,7 +51,7 @@ RankingsDatabase::~RankingsDatabase()
 void RankingsDatabase::wipeTables()
 {
     std::lock_guard<std::mutex> lock(m_dbMtx);
-    LOG_DEBUG("Wiping tables...");
+    LOG_DEBUG("Wiping tables");
 
     try
     {
@@ -77,7 +77,7 @@ void RankingsDatabase::wipeTables()
 void RankingsDatabase::shiftRanks(Gamemode const& mode)
 {
     std::lock_guard<std::mutex> lock(m_dbMtx);
-    LOG_DEBUG("Shifting ranks for ", mode.toString(), "...");
+    LOG_DEBUG("Shifting ranks for ", mode.toString());
 
     const std::string table = k_modeToRankingsTable.at(mode);
     const std::string query =
@@ -94,7 +94,7 @@ void RankingsDatabase::shiftRanks(Gamemode const& mode)
 void RankingsDatabase::insertRankingsUsers(std::vector<RankingsUser> const& rankingsUsers, Gamemode const& mode)
 {
     std::lock_guard<std::mutex> lock(m_dbMtx);
-    LOG_DEBUG("Inserting ", rankingsUsers.size(), " rankings users into " + mode.toString() + "...");
+    LOG_DEBUG("Inserting ", rankingsUsers.size(), " rankings users into ", mode.toString());
 
     const std::string table = k_modeToRankingsTable.at(mode);
 
@@ -133,7 +133,7 @@ void RankingsDatabase::insertRankingsUsers(std::vector<RankingsUser> const& rank
 void RankingsDatabase::deleteUsersWithNullCurrentRank(Gamemode const& mode)
 {
     std::lock_guard<std::mutex> lock(m_dbMtx);
-    LOG_DEBUG("Removing users with NULL current rank from " + mode.toString() + "...");
+    LOG_DEBUG("Removing users with NULL current rank from ", mode.toString());
 
     const std::string table = k_modeToRankingsTable.at(mode);
 
@@ -146,7 +146,7 @@ void RankingsDatabase::deleteUsersWithNullCurrentRank(Gamemode const& mode)
 [[nodiscard]] std::vector<UserID> RankingsDatabase::getUserIDsWithNullYesterdayRank(Gamemode const& mode)
 {
     std::lock_guard<std::mutex> lock(m_dbMtx);
-    LOG_DEBUG("Finding users with NULL yesterday rank from " + mode.toString() + "...");
+    LOG_DEBUG("Finding users with NULL yesterday rank from ", mode.toString());
 
     const std::string table = k_modeToRankingsTable.at(mode);
 
@@ -166,7 +166,7 @@ void RankingsDatabase::deleteUsersWithNullCurrentRank(Gamemode const& mode)
 void RankingsDatabase::updateYesterdayRanks(std::vector<std::pair<UserID, Rank>> const& userYesterdayRanks, Gamemode const& mode)
 {
     std::lock_guard<std::mutex> lock(m_dbMtx);
-    LOG_DEBUG("Updating yesterday ranks of ", userYesterdayRanks.size(), " users from " + mode.toString() + "...");
+    LOG_DEBUG("Updating yesterday ranks of ", userYesterdayRanks.size(), " users from ", mode.toString());
 
     const std::string table = k_modeToRankingsTable.at(mode);
 
@@ -194,7 +194,7 @@ void RankingsDatabase::updateYesterdayRanks(std::vector<std::pair<UserID, Rank>>
 [[nodiscard]] bool RankingsDatabase::hasEmptyTable()
 {
     std::lock_guard<std::mutex> lock(m_dbMtx);
-    LOG_DEBUG("Checking if database has empty tables...");
+    LOG_DEBUG("Checking if database has empty tables");
 
     for (auto const& [_, table] : k_modeToRankingsTable)
     {
@@ -221,7 +221,7 @@ void RankingsDatabase::updateYesterdayRanks(std::vector<std::pair<UserID, Rank>>
     Gamemode const& mode)
 {
     std::lock_guard<std::mutex> lock(m_dbMtx);
-    LOG_DEBUG("Retrieving top users by rank improvement from " + mode.toString() + "...");
+    LOG_DEBUG("Retrieving top users by rank improvement from ", mode.toString());
 
     std::string table = k_modeToRankingsTable.at(mode);
 
@@ -289,7 +289,7 @@ void RankingsDatabase::updateYesterdayRanks(std::vector<std::pair<UserID, Rank>>
     Gamemode const& mode)
 {
     std::lock_guard<std::mutex> lock(m_dbMtx);
-    LOG_DEBUG("Retrieving bottom users by rank improvement from " + mode.toString() + "...");
+    LOG_DEBUG("Retrieving bottom users by rank improvement from ", mode.toString());
 
     std::string table = k_modeToRankingsTable.at(mode);
 
@@ -351,7 +351,7 @@ void RankingsDatabase::updateYesterdayRanks(std::vector<std::pair<UserID, Rank>>
  */
 void RankingsDatabase::createTables_()
 {
-    LOG_DEBUG("Creating tables...");
+    LOG_DEBUG("Creating tables");
 
     try
     {

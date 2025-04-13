@@ -60,22 +60,6 @@ bool OsuWrapper::getBeatmap(BeatmapID const& beatmapID, nlohmann::json& beatmap 
 }
 
 /**
- * Get osu! beatmap attributes for given gamemode after applying mods.
- */
-bool OsuWrapper::getBeatmapAttributes(BeatmapID const& beatmapID, Gamemode const& mode, OsuMods const& mods, nlohmann::json& attributes /* out */)
-{
-    LOG_DEBUG("Requesting attributes for ", mode.toString(), " beatmap ", beatmapID, " with mods ", mods.toString());
-    std::string url = "https://osu.ppy.sh/api/v2/beatmaps/" + std::to_string(beatmapID) + "/attributes";
-    nlohmann::json requestBodyJson = {
-        { "mods", mods.get() },
-        { "ruleset", mode.toString() }
-    };
-
-    return apiRequest_(url, "POST", {}, requestBodyJson.dump(), attributes);
-}
-
-
-/**
  * WARNING: It is possible for this function to retry forever!
  *
  * Send request to osu!API v2.
