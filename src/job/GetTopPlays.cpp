@@ -14,7 +14,7 @@ namespace
 void getTopPlaysMode(OsutrackWrapper& osutrack, OsuWrapper& osu, std::shared_ptr<TopPlaysDatabase> pTopPlaysDb, ISO8601DateTimeUTC const& now, Gamemode const& mode)
 {
     // Grab the top plays
-    LOG_INFO("Retrieving top ", k_numTopPlays, " ", mode.toString(), " plays from today...");
+    LOG_INFO("Retrieving top ", k_numTopPlays, " ", mode.toString(), " plays from today");
     nlohmann::json bestPlaysArr;
     ISO8601DateTimeUTC yesterday = now;
     yesterday.addDays(-1);
@@ -108,15 +108,7 @@ void getTopPlaysMode(OsutrackWrapper& osutrack, OsuWrapper& osu, std::shared_ptr
                 tp.score.beatmap.artist = beatmapObj.at("beatmapset").at("artist").get<BeatmapArtist>();
                 tp.score.beatmap.title = beatmapObj.at("beatmapset").at("title").get<BeatmapTitle>();
                 tp.score.beatmap.mapsetCreator = beatmapObj.at("beatmapset").at("creator").get<Username>();
-
-                // Get star rating from osu!API and fill it in
-                nlohmann::json attributesObj;
-                LOG_ERROR_THROW(
-                    osu.getBeatmapAttributes(tp.score.beatmap.beatmapID, mode, tp.score.mods, attributesObj),
-                    "Failed to get attributes for ", mode.toString(), " beatmap ", tp.score.beatmap.beatmapID, " with mods ", tp.score.mods.toString()
-                );
-
-                tp.score.beatmap.starRating = attributesObj.at("attributes").at("star_rating").get<StarRating>();
+                tp.score.beatmap.starRating = beatmapObj.at("difficulty_rating").get<StarRating>();
             }
         }
 
@@ -126,24 +118,27 @@ void getTopPlaysMode(OsutrackWrapper& osutrack, OsuWrapper& osu, std::shared_ptr
         );
     }
 
-    LOG_INFO("Populating database...");
+    LOG_INFO("Populating database");
     pTopPlaysDb->insertTopPlays(mode, topPlays);
 }
 } /* namespace */
 
 /**
  * Get daily top plays for each mode.
- * Makes 4 osutrack API calls and up to 4*k_numTopPlays osu!API calls.
+ * Makes 4 osutrack API calls and up to 3*k_numTopPlays osu!API calls.
  */
-void getTopPlays(std::shared_ptr<TokenManager> pTokenManager, std::shared_ptr<TopPlaysDatabase> pTopPlaysDb)
+void getTopPlays(std::shared_ptr<TokenManager> pTokenManager, std::shared_ptr<TopPlaysDatabase> pTopPlaysDb, bool bParallel)
 {
-    LOG_INFO("Grabbing top plays of the day...");
+    // FUTURE: implement
+    LOG_ERROR_THROW(!bParallel, "Concurrent version of getTopPlays is not implemented!");
+
+    LOG_INFO("Grabbing top plays of the day");
 
     OsutrackWrapper osutrack(0);
     OsuWrapper osu(pTokenManager, 0);
     ISO8601DateTimeUTC now;
 
-    LOG_INFO("Wiping tables...");
+    LOG_INFO("Wiping tables");
     pTopPlaysDb->wipeTables();
 
     // Do work for each mode

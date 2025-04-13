@@ -74,7 +74,7 @@ int main() noexcept
         // Load environment variables
         if (!std::filesystem::exists(k_dosuConfigFilePath))
         {
-            LOG_WARN("Cannot find config file! Running setup tool...");
+            LOG_WARN("Cannot find config file! Running setup tool");
             DosuConfig::setupConfig(k_dosuConfigFilePath);
             return 0;
         }
@@ -102,13 +102,13 @@ int main() noexcept
         std::unique_ptr<DailyJob> scrapeRankingsJob = std::make_unique<DailyJob>(
             DosuConfig::scrapeRankingsRunHour,
             "scrapeRankings",
-            [&pTokenManager, &pRankingsDatabase] { scrapeRankings(pTokenManager, pRankingsDatabase); },
+            [&pTokenManager, &pRankingsDatabase] { scrapeRankings(pTokenManager, pRankingsDatabase, DosuConfig::scrapeRankingsParallel); },
             [&pBot]() { pBot->scrapeRankingsCallback(); }
         );
         std::unique_ptr<DailyJob> topPlaysJob = std::make_unique<DailyJob>(
             DosuConfig::topPlaysRunHour,
             "getTopPlays",
-            [&pTokenManager, &pTopPlaysDatabase] { getTopPlays(pTokenManager, pTopPlaysDatabase); },
+            [&pTokenManager, &pTopPlaysDatabase] { getTopPlays(pTokenManager, pTopPlaysDatabase, DosuConfig::topPlaysParallel); },
             [&pBot]() { pBot->topPlaysCallback(); }
         );
 
@@ -123,7 +123,7 @@ int main() noexcept
         }
 
         // Clean everything up
-        LOG_INFO("Cleaning up resources and connections - PLEASE DON'T SHUT DOWN...");
+        LOG_INFO("Cleaning up resources and connections - PLEASE DON'T SHUT DOWN");
         scrapeRankingsJob->stop();
         topPlaysJob->stop();
         pBot->stop();

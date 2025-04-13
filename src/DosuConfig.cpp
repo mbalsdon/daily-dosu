@@ -15,6 +15,8 @@ std::string DosuConfig::osuClientID;
 std::string DosuConfig::osuClientSecret;
 int DosuConfig::scrapeRankingsRunHour;
 int DosuConfig::topPlaysRunHour;
+bool DosuConfig::scrapeRankingsParallel;
+bool DosuConfig::topPlaysParallel;
 std::filesystem::path DosuConfig::rankingsDatabaseFilePath;
 std::filesystem::path DosuConfig::topPlaysDatabaseFilePath;
 std::filesystem::path DosuConfig::botConfigDatabaseFilePath;
@@ -24,7 +26,7 @@ namespace
 {
 /**
  * Convert given hour from UTC to system timezone.
- * Thanks to the dev who put this on SO 14 years ago and thanks to Claude for feeding it to me!
+ * guy on SO 14 years ago -> claude -> this
  */
 [[nodiscard]] int utcToLocal(int const& utcHour) noexcept
 {
@@ -79,7 +81,7 @@ void DosuConfig::load(std::filesystem::path const& filePath)
     DosuConfig::logLevel = configDataJson.at(k_logLevelKey);
     if (DosuConfig::logLevel < 0 || DosuConfig::logLevel > 3)
     {
-        LOG_WARN("Configured ", k_logLevelKey, " is out of bounds! Setting to 1...");
+        LOG_WARN("Configured ", k_logLevelKey, " is out of bounds! Setting to 1");
         DosuConfig::logLevel = 1;
     }
     DosuConfig::discordBotToken = configDataJson.at(k_discordBotTokenKey);
@@ -90,14 +92,16 @@ void DosuConfig::load(std::filesystem::path const& filePath)
     if (DosuConfig::scrapeRankingsRunHour < 0 || DosuConfig::scrapeRankingsRunHour > 23)
     {
         DosuConfig::scrapeRankingsRunHour = DosuConfig::scrapeRankingsRunHour % 24;
-        LOG_WARN("Configured ", k_scrapeRankingsRunHourKey, " is out of bounds! Normalizing to ", DosuConfig::scrapeRankingsRunHour, "...");
+        LOG_WARN("Configured ", k_scrapeRankingsRunHourKey, " is out of bounds! Normalizing to ", DosuConfig::scrapeRankingsRunHour);
     }
     DosuConfig::topPlaysRunHour = configDataJson.at(k_topPlaysRunHourKey);
     if (DosuConfig::topPlaysRunHour < 0 || DosuConfig::topPlaysRunHour > 23)
     {
         DosuConfig::topPlaysRunHour = DosuConfig::topPlaysRunHour % 24;
-        LOG_WARN("Configured ", k_topPlaysRunHourKey, " is out of bounds! Normalizing to ", DosuConfig::topPlaysRunHour, "...");
+        LOG_WARN("Configured ", k_topPlaysRunHourKey, " is out of bounds! Normalizing to ", DosuConfig::topPlaysRunHour);
     }
+    DosuConfig::scrapeRankingsParallel = configDataJson.at(k_scrapeRankingsParallelKey);
+    DosuConfig::topPlaysParallel = configDataJson.at(k_topPlaysParallelKey);
     DosuConfig::rankingsDatabaseFilePath = std::filesystem::path(configDataJson.at(k_rankingsDbFilePathKey));
     DosuConfig::topPlaysDatabaseFilePath = std::filesystem::path(configDataJson.at(k_topPlaysDbFilePathKey));
     DosuConfig::botConfigDatabaseFilePath = std::filesystem::path(configDataJson.at(k_botConfigDbFilePathKey));
@@ -108,12 +112,14 @@ void DosuConfig::load(std::filesystem::path const& filePath)
  */
 void DosuConfig::setupConfig(std::filesystem::path const& filePath)
 {
-    LOG_DEBUG("Running config setup tool...");
+    LOG_DEBUG("Running config setup tool");
 
     nlohmann::json newConfigJson;
     newConfigJson[k_logLevelKey] = 1;
     newConfigJson[k_scrapeRankingsRunHourKey] = utcToLocal(3);
-    newConfigJson[k_topPlaysRunHourKey] = utcToLocal(3);
+    newConfigJson[k_topPlaysRunHourKey] = utcToLocal(1);
+    newConfigJson[k_scrapeRankingsParallelKey] = true;
+    newConfigJson[k_topPlaysParallelKey] = false;
 
     std::string botToken;
     std::string clientID;

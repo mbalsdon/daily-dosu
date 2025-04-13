@@ -30,7 +30,6 @@ public:
     EmbedGenerator() = default;
     ~EmbedGenerator() = default;
 
-    // FUTURE: marking things const instead of static because we might some of these fns to be polymorphic later
     [[nodiscard]] dpp::embed helpEmbed() const;
     [[nodiscard]] dpp::embed scrapeRankingsEmbed(
         std::string const& countryCode,
@@ -41,16 +40,18 @@ public:
     [[nodiscard]] dpp::embed topPlaysEmbed(
         std::vector<TopPlay> const& topPlays,
         Gamemode const& mode,
-        std::string const& countryCode) const;
+        std::string const& countryCode,
+        std::string const& mods) const;
 
     [[nodiscard]] dpp::component scrapeRankingsActionRow1() const;
     [[nodiscard]] dpp::component scrapeRankingsActionRow2() const;
     [[nodiscard]] dpp::component topPlaysActionRow1() const;
-    [[nodiscard]] dpp::interaction_modal_response scrapeRankingsFilterCountryModal() const;
-    [[nodiscard]] dpp::interaction_modal_response topPlaysFilterCountryModal() const;
-    [[nodiscard]] dpp::interaction_modal_response scrapeRankingsFilterModeModal() const;
-    [[nodiscard]] dpp::interaction_modal_response topPlaysFilterModeModal() const;
 
+    [[nodiscard]] dpp::interaction_modal_response scrapeRankingsFilterCountryModal() const;
+    [[nodiscard]] dpp::interaction_modal_response scrapeRankingsFilterModeModal() const;
+    [[nodiscard]] dpp::interaction_modal_response topPlaysFilterCountryModal() const;
+    [[nodiscard]] dpp::interaction_modal_response topPlaysFilterModsModal() const;
+    [[nodiscard]] dpp::interaction_modal_response topPlaysFilterModeModal() const;
 
 private:
     void addPlayersToScrapeRankingsDescription_(

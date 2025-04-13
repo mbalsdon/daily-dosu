@@ -12,6 +12,7 @@
 #include <cstring>
 #include <regex>
 #include <optional>
+#include <set>
 
 namespace
 {
@@ -118,15 +119,15 @@ namespace
 {
     std::string ret = "";
 
-    std::vector<std::string> modStrings = mods.get();
-    for (std::size_t i = 0; i < modStrings.size(); ++i)
+    std::set<std::string> modStrings = mods.get();
+    std::size_t i = 0;
+    for (auto modStr : modStrings)
     {
         if (i > 0)
         {
             ret += " ";
         }
 
-        std::string modStr = modStrings.at(i);
         std::transform(modStr.begin(), modStr.end(), modStr.begin(), ::toupper);
 
         if (modStr == "MR") ret += DosuConfig::discordBotStrings[k_modMRKey];
@@ -163,6 +164,8 @@ namespace
             LOG_ERROR("Unhandled mod string: ", modStr);
             ret += modStr;
         }
+
+        ++i;
     }
 
     return ret;
@@ -189,12 +192,15 @@ namespace
 }
 } /* namespace */
 
+//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\////\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//
+//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\////\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//
+
 /**
  * Create help embed.
  */
 [[nodiscard]] dpp::embed EmbedGenerator::helpEmbed() const
 {
-    LOG_DEBUG("Building help embed...");
+    LOG_DEBUG("Building help embed");
 
     dpp::embed embed = dpp::embed()
         .set_timestamp(time(0))
@@ -225,7 +231,7 @@ namespace
     std::vector<RankImprovement> const& top,
     std::vector<RankImprovement> const& bottom) const
 {
-    LOG_DEBUG("Building scrapeRankings embed for range ", rankRange.toString(), " and mode ", mode.toString(), "...");
+    LOG_DEBUG("Building scrapeRankings embed for range=", rankRange.toString(), ", mode=", mode.toString(), "countryCode=", countryCode);
 
     // Add static embed fields
     int utcHour = localToUtc(DosuConfig::scrapeRankingsRunHour);
@@ -242,7 +248,7 @@ namespace
         );
 
     // Add range-dependent embed fields
-    embed.add_field("", EmbedMetadata(countryCode, rankRange, mode).toEmbedString());
+    embed.add_field("", EmbedMetadata(countryCode, rankRange, mode, std::nullopt).toEmbedString());
 
     if (!top.empty())
     {
@@ -277,9 +283,10 @@ namespace
 [[nodiscard]] dpp::embed EmbedGenerator::topPlaysEmbed(
     std::vector<TopPlay> const& topPlays,
     Gamemode const& mode,
-    std::string const& countryCode) const
+    std::string const& countryCode,
+    std::string const& mods) const
 {
-    LOG_DEBUG("Building getTopPlays embed for mode ", mode.toString(), "...");
+    LOG_DEBUG("Building getTopPlays embed for mode=", mode.toString(), ", countryCode=", countryCode, ", mods=", mods);
 
     // Add static embed fields
     int utcHour = localToUtc(DosuConfig::topPlaysRunHour);
@@ -297,7 +304,7 @@ namespace
         );
 
     // Add variable embed fields
-    embed.add_field("", EmbedMetadata(countryCode, std::nullopt, mode).toEmbedString());
+    embed.add_field("", EmbedMetadata(countryCode, std::nullopt, mode, OsuMods(mods)).toEmbedString());
     if (!topPlays.empty())
     {
         embed.set_thumbnail(topPlays.at(0).score.user.pfpLink);
@@ -318,12 +325,15 @@ namespace
     return embed;
 }
 
+//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\////\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//
+//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\////\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//
+
 /**
  * Create first scrapeRankings action row.
  */
 [[nodiscard]] dpp::component EmbedGenerator::scrapeRankingsActionRow1() const
 {
-    LOG_DEBUG("Building 1st scrapeRankings action row...");
+    LOG_DEBUG("Building 1st scrapeRankings action row");
 
     dpp::component firstRangeButton;
     firstRangeButton.set_type(dpp::cot_button);
@@ -357,7 +367,7 @@ namespace
  */
 [[nodiscard]] dpp::component EmbedGenerator::scrapeRankingsActionRow2() const
 {
-    LOG_DEBUG("Building 2nd scrapeRankings action row...");
+    LOG_DEBUG("Building 2nd scrapeRankings action row");
 
     dpp::component filterCountryButton;
     filterCountryButton.set_type(dpp::cot_button);
@@ -391,13 +401,19 @@ namespace
  */
 [[nodiscard]] dpp::component EmbedGenerator::topPlaysActionRow1() const
 {
-    LOG_DEBUG("Building 1st getTopPlays action row...");
+    LOG_DEBUG("Building 1st getTopPlays action row");
 
     dpp::component filterCountryButton;
     filterCountryButton.set_type(dpp::cot_button);
     filterCountryButton.set_label("Filter by country");
     filterCountryButton.set_style(dpp::cos_primary);
     filterCountryButton.set_id(k_topPlaysFilterCountryButtonID);
+
+    dpp::component filterModsButton;
+    filterModsButton.set_type(dpp::cot_button);
+    filterModsButton.set_label("Filter by mods");
+    filterModsButton.set_style(dpp::cos_primary);
+    filterModsButton.set_id(k_topPlaysFilterModsButtonID);
 
     dpp::component selectModeButton;
     selectModeButton.set_type(dpp::cot_button);
@@ -414,18 +430,22 @@ namespace
     dpp::component actionRow;
     actionRow.set_type(dpp::cot_action_row);
     actionRow.add_component(filterCountryButton);
+    actionRow.add_component(filterModsButton);
     actionRow.add_component(selectModeButton);
     actionRow.add_component(clearFiltersButton);
 
     return actionRow;
 }
 
+//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\////\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//
+//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\////\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//
+
 /**
  * Create scrapeRankings filter-by-country modal.
  */
 [[nodiscard]] dpp::interaction_modal_response EmbedGenerator::scrapeRankingsFilterCountryModal() const
 {
-    LOG_DEBUG("Building scrapeRankings filter-by-country modal...");
+    LOG_DEBUG("Building scrapeRankings filter-by-country modal");
 
     dpp::component textInput;
     textInput.set_type(dpp::cot_text);
@@ -443,33 +463,11 @@ namespace
 }
 
 /**
- * Create getTopPlays filter-by-country modal.
- */
-[[nodiscard]] dpp::interaction_modal_response EmbedGenerator::topPlaysFilterCountryModal() const
-{
-    LOG_DEBUG("Building getTopPlays filter-by-country modal...");
-
-    dpp::component textInput;
-    textInput.set_type(dpp::cot_text);
-    textInput.set_label("Enter country to filter by:");
-    textInput.set_id(k_topPlaysFilterCountryTextInputID);
-    textInput.set_placeholder("e.g. KR / KOR / South Korea");
-    textInput.set_text_style(dpp::text_short);
-
-    dpp::interaction_modal_response modal;
-    modal.set_custom_id(k_topPlaysFilterCountryModalID);
-    modal.set_title("Filter by country");
-    modal.add_component(textInput);
-
-    return modal;
-}
-
-/**
  * Create scrapeRankings filter-by-mode modal.
  */
 [[nodiscard]] dpp::interaction_modal_response EmbedGenerator::scrapeRankingsFilterModeModal() const
 {
-    LOG_DEBUG("Building scrapeRankings filter-by-mode modal...");
+    LOG_DEBUG("Building scrapeRankings filter-by-mode modal");
 
     dpp::component textInput;
     textInput.set_type(dpp::cot_text);
@@ -487,11 +485,52 @@ namespace
 }
 
 /**
+ * Create getTopPlays filter-by-country modal.
+ */
+[[nodiscard]] dpp::interaction_modal_response EmbedGenerator::topPlaysFilterCountryModal() const
+{
+    LOG_DEBUG("Building getTopPlays filter-by-country modal");
+
+    dpp::component textInput;
+    textInput.set_type(dpp::cot_text);
+    textInput.set_label("Enter country to filter by:");
+    textInput.set_id(k_topPlaysFilterCountryTextInputID);
+    textInput.set_placeholder("e.g. KR / KOR / South Korea");
+    textInput.set_text_style(dpp::text_short);
+
+    dpp::interaction_modal_response modal;
+    modal.set_custom_id(k_topPlaysFilterCountryModalID);
+    modal.set_title("Filter by country");
+    modal.add_component(textInput);
+
+    return modal;
+}
+
+[[nodiscard]] dpp::interaction_modal_response EmbedGenerator::topPlaysFilterModsModal() const
+{
+    LOG_DEBUG("Building getTopPlays filter-by-mods modal");
+
+    dpp::component textInput;
+    textInput.set_type(dpp::cot_text);
+    textInput.set_label("Enter mods to filter by:");
+    textInput.set_id(k_topPlaysFilterModsTextInputID);
+    textInput.set_placeholder("e.g. HD, HDDT, DTHRDTFL");
+    textInput.set_text_style(dpp::text_short);
+
+    dpp::interaction_modal_response modal;
+    modal.set_custom_id(k_topPlaysFilterModsModalID);
+    modal.set_title("Filter by mods");
+    modal.add_component(textInput);
+
+    return modal;
+}
+
+/**
  * Create getTopPlays filter-by-mode modal.
  */
 [[nodiscard]] dpp::interaction_modal_response EmbedGenerator::topPlaysFilterModeModal() const
 {
-    LOG_DEBUG("Building getTopPlays filter-by-mode-modal...");
+    LOG_DEBUG("Building getTopPlays filter-by-mode modal");
 
     dpp::component textInput;
     textInput.set_type(dpp::cot_text);
@@ -507,6 +546,9 @@ namespace
 
     return modal;
 }
+
+//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\////\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//
+//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\////\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//
 
 /**
  * Helper function for scrapeRankingsEmbed.
@@ -565,7 +607,7 @@ void EmbedGenerator::addPlayersToTopPlaysDescription_(
 {
     if (topPlays.size() < 1)
     {
-        description << "Looks like nobody set top plays today... This is a bug!\n";
+        description << "Looks like nobody set top plays today... :shrug:\n";
         return;
     }
 

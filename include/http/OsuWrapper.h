@@ -29,7 +29,6 @@ public:
     bool getUser(UserID const& userID, Gamemode const& mode, nlohmann::json& user /* out */);
     bool getUserBeatmapScores(Gamemode const& mode, UserID const& userID, BeatmapID const& beatmapID, nlohmann::json& userBeatmapScores /* out */);
     bool getBeatmap(BeatmapID const& beatmapID, nlohmann::json& beatmap /* out */);
-    bool getBeatmapAttributes(BeatmapID const& beatmapID, Gamemode const& mode, OsuMods const& mods, nlohmann::json& attributes /* out */);
 
 private:
     [[nodiscard]] bool apiRequest_(std::string const& url, std::string const& method, std::vector<std::string> headers, std::string const& body, nlohmann::json& responseDataJson /* out */);

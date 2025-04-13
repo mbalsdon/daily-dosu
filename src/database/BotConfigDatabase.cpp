@@ -145,7 +145,7 @@ void BotConfigDatabase::removeSubscription(dpp::snowflake const& channelID, std:
  */
 void BotConfigDatabase::createTables_()
 {
-    LOG_DEBUG("Creating tables...");
+    LOG_DEBUG("Creating tables");
 
     /* Discord IDs (snowflakes) are uint64 but SQLiteCpp's largest native type is int64.
     So this would not be a good idea, however the first 41 bits of a (Discord) snowflake

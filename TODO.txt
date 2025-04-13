@@ -1,36 +1,10 @@
 - TODO
 
 --- getTopPlays
-
------ filter by mods
-------- change OsuMods underlying to set?
-------- do the full apispam for only top numDisplay plays, calling only getUserBeatmapScores for the rest?
---------- allows us to grab a lot more top plays
-
------ parallelize
------ ctrlF, commit
-
------ video embedding: o!rdr or doing it ourselves?
-------- doing ourselves:
-------- get scoreID: https://osu.ppy.sh/docs/index.html#get-a-user-beatmap-scores (else, try matching thru their tops/recents?)
-------- download osr (e.g. GET https://osu.ppy.sh/scores/1497268101/download , this is public but maybe try through api route https://osu.ppy.sh/docs/index.html#get-apiv2scoresscoredownload)
-------- convert to video https://github.com/Wieku/danser-go (osr to mp4?)
-------- can video be included in discord embed? else just put in raw message
---------- be wary of workload; compress or increase ratelimit?
-
------ readme
-
------ test (run for few days, try from weird states, etc.)
-------- fix if needed
-------- ctrlF, commit
-
------ pushhh
-------- need to add DISCORD_BOT_STRINGS to dosu_config
-------- need to wipe rankings.db on prod since performancePoints went from int -> float
-------- need to update bot_config.db on prod since we added enabled/disabled newsletters
+----- unsubscribe if channel unknown
 
 - FUTURE
-
---- threadpooling parallelized work
-
+--- bot/embedgen refactor; sort of atomic-design style (component based as much as we can; e.g. filter modals are perfect for this)
+----- embedgenerator does not have to be a class btw (no state)?
+--- threadpooling parallelized work, impl bot seq/par for all jobs
 --- new job: username changes in top X players

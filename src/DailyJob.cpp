@@ -17,7 +17,7 @@ namespace
     if (hour < 0 || hour > 23)
     {
         int normalizedHour = (24 + (hour % 24)) % 24;
-        LOG_WARN("Hour is out of bounds, normalizing to ", normalizedHour, "...");
+        LOG_WARN("Hour is out of bounds, normalizing to ", normalizedHour);
         return normalizedHour;
     }
     else
@@ -62,7 +62,7 @@ void DailyJob::start()
         return;
     }
 
-    LOG_INFO("Running job ", m_name, " at every ", m_hour, "th hour...");
+    LOG_INFO("Running job ", m_name, " at every ", m_hour, "th hour");
     m_bRunning = true;
     m_jobThread = std::make_unique<std::thread>(&DailyJob::runJobLoop_, this);
 }
@@ -78,7 +78,7 @@ void DailyJob::stop()
         {
             return;
         }
-        LOG_INFO("Halting job ", m_name, "...");
+        LOG_INFO("Halting job ", m_name);
         m_bRunning = false;
     }
 
@@ -96,12 +96,12 @@ void DailyJob::stop()
  */
 void DailyJob::runJobLoop_()
 {
-    LOG_DEBUG("Running job loop...");
+    LOG_DEBUG("Running job loop");
     while (m_bRunning)
     {
         // Sleep until next run
         auto nextRun = calculateNextRun_();
-        LOG_DEBUG(m_name, " sleeping for ", static_cast<double>(std::chrono::duration_cast<std::chrono::seconds>(nextRun - std::chrono::system_clock::now()).count()) / 3600., " hours...");
+        LOG_DEBUG(m_name, " sleeping for ", static_cast<double>(std::chrono::duration_cast<std::chrono::seconds>(nextRun - std::chrono::system_clock::now()).count()) / 3600., " hours");
         {
             std::unique_lock<std::mutex> lock(m_jobMtx);
             if (m_jobCV.wait_until(lock, nextRun, [this] { return !m_bRunning; }))
@@ -113,7 +113,7 @@ void DailyJob::runJobLoop_()
         // Run job and callback
         try
         {
-            LOG_INFO(m_name, " beginning execution...");
+            LOG_INFO(m_name, " beginning execution");
             auto startTime = std::chrono::steady_clock::now();
 
             m_job();
@@ -124,7 +124,7 @@ void DailyJob::runJobLoop_()
 
             if (m_jobCallback)
             {
-                LOG_DEBUG("Executing callback for ", m_name, "...");
+                LOG_DEBUG("Executing callback for ", m_name);
                 m_jobCallback();
             }
         }

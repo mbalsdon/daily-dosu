@@ -31,7 +31,7 @@ public:
     void wipeTables();
     [[nodiscard]] bool hasEmptyTable();
     void insertTopPlays(Gamemode const& mode, std::vector<TopPlay> const& topPlays);
-    [[nodiscard]] std::vector<TopPlay> getTopPlays(std::string const& countryCode, std::size_t const& numTopPlays, Gamemode const& mode);
+    [[nodiscard]] std::vector<TopPlay> getTopPlays(std::string const& countryCode, std::size_t const& numTopPlays, Gamemode const& mode, std::string const& mods);
 
 private:
     void createTables_();
