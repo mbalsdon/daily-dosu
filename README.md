@@ -1,6 +1,6 @@
 # daily-dosu
 
-A Discord bot for tracking [osu!](https://osu.ppy.sh) leaderboard changes. You can add the bot to your server with [this link](https://discord.com/oauth2/authorize?client_id=1109638103485907094).
+A Discord bot that gives you daily [osu!](https://osu.ppy.sh) updates. You can add the bot to your server with [this link](https://discord.com/oauth2/authorize?client_id=1109638103485907094).
 
 ## Features
 
