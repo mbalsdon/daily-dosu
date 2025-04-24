@@ -85,6 +85,7 @@ int main() noexcept
 
         // Initialize logger
         Logger::getInstance().setLogLevel(DosuConfig::logLevel);
+        Logger::getInstance().setLogColors(DosuConfig::logAnsiColors);
 
         // Initialize token manager
         std::shared_ptr<TokenManager> pTokenManager = std::make_shared<TokenManager>(DosuConfig::osuClientID, DosuConfig::osuClientSecret);
@@ -99,22 +100,22 @@ int main() noexcept
         pBot->start();
 
         // Initialize jobs
-        std::unique_ptr<DailyJob> scrapeRankingsJob = std::make_unique<DailyJob>(
+        std::unique_ptr<DailyJob> pScrapeRankingsJob = std::make_unique<DailyJob>(
             DosuConfig::scrapeRankingsRunHour,
             "scrapeRankings",
-            [&pTokenManager, &pRankingsDatabase] { scrapeRankings(pTokenManager, pRankingsDatabase, DosuConfig::scrapeRankingsParallel); },
+            [&pTokenManager, &pRankingsDatabase]() { scrapeRankings(pTokenManager, pRankingsDatabase); },
             [&pBot]() { pBot->scrapeRankingsCallback(); }
         );
-        std::unique_ptr<DailyJob> topPlaysJob = std::make_unique<DailyJob>(
+        std::unique_ptr<DailyJob> pTopPlaysJob = std::make_unique<DailyJob>(
             DosuConfig::topPlaysRunHour,
             "getTopPlays",
-            [&pTokenManager, &pTopPlaysDatabase] { getTopPlays(pTokenManager, pTopPlaysDatabase, DosuConfig::topPlaysParallel); },
+            [&pTokenManager, &pTopPlaysDatabase]() { getTopPlays(pTokenManager, pTopPlaysDatabase); },
             [&pBot]() { pBot->topPlaysCallback(); }
         );
 
         // Start jobs
-        scrapeRankingsJob->start();
-        topPlaysJob->start();
+        pScrapeRankingsJob->start();
+        pTopPlaysJob->start();
 
         // Wait for shutdown signal
         {
@@ -124,8 +125,8 @@ int main() noexcept
 
         // Clean everything up
         LOG_INFO("Cleaning up resources and connections - PLEASE DON'T SHUT DOWN");
-        scrapeRankingsJob->stop();
-        topPlaysJob->stop();
+        pScrapeRankingsJob->stop();
+        pTopPlaysJob->stop();
         pBot->stop();
         curl_global_cleanup();
 

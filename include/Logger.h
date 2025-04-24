@@ -50,6 +50,11 @@ public:
         m_logLevel = level;
     }
 
+    void setLogColors(bool const& enable)
+    {
+        m_logAnsiColors = enable;
+    }
+
     template<typename... Args>
     void log(Level const& level, SourceLocation const& location, Args&&... args) const
     {
@@ -64,8 +69,15 @@ public:
         auto nowMs = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()) % 1000;
         auto threadID = std::this_thread::get_id();
 
-        // Append prefix
         std::stringstream ss;
+
+        // Add color
+        if (m_logAnsiColors)
+        {
+            ss << "\033[" + levelToColor_(level) << "m";
+        }
+
+        // Append prefix
         ss << "[" << levelToString_(level) << "] ";
         if (m_logLevel <= Level::DEBUG)
         {
@@ -77,6 +89,12 @@ public:
 
         // Append messages
         (ss << ... << std::forward<Args>(args)) << std::endl;
+
+        // Reset color
+        if (m_logAnsiColors)
+        {
+            ss << "\033[0m";
+        }
 
         // Send to stdout (thread-safe)
         std::cout << ss.str() << std::flush;
@@ -113,7 +131,20 @@ private:
         }
     }
 
+    [[nodiscard]] static std::string levelToColor_(Level const& level) noexcept
+    {
+        switch (level)
+        {
+        case Level::DEBUG: return "90";
+        case Level::INFO: return "37";
+        case Level::WARNING: return "33";
+        case Level::ERROR: return "31";
+        default: return 0;
+        }
+    }
+
     Level m_logLevel = Level::INFO;
+    bool m_logAnsiColors = false;
 };
 
 #define CURRENT_LOCATION SourceLocation(__FILE__, __func__, __LINE__)
