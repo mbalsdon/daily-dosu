@@ -6,13 +6,12 @@
 #include <map>
 
 const std::string k_logLevelKey               = "LOG_LEVEL";
+const std::string k_logAnsiColorsKey          = "LOG_ANSI_COLORS";
 const std::string k_discordBotTokenKey        = "DISCORD_BOT_TOKEN";
 const std::string k_osuClientIdKey            = "OSU_CLIENT_ID";
 const std::string k_osuClientSecretKey        = "OSU_CLIENT_SECRET";
 const std::string k_scrapeRankingsRunHourKey  = "SCRAPE_RANKINGS_RUN_HOUR";
 const std::string k_topPlaysRunHourKey        = "TOP_PLAYS_RUN_HOUR";
-const std::string k_scrapeRankingsParallelKey = "SCRAPE_RANKINGS_PARALLEL";
-const std::string k_topPlaysParallelKey       = "TOP_PLAYS_PARALLEL";
 const std::string k_rankingsDbFilePathKey     = "RANKINGS_DB_FILE_PATH";
 const std::string k_topPlaysDbFilePathKey     = "TOP_PLAYS_DB_FILE_PATH";
 const std::string k_botConfigDbFilePathKey    = "BOT_CONFIG_DB_FILE_PATH";
@@ -67,13 +66,12 @@ public:
     static void setupConfig(std::filesystem::path const& filePath);
 
     static int logLevel;
+    static bool logAnsiColors;
     static std::string discordBotToken;
     static std::string osuClientID;
     static std::string osuClientSecret;
     static int scrapeRankingsRunHour;
     static int topPlaysRunHour;
-    static bool scrapeRankingsParallel;
-    static bool topPlaysParallel;
     static std::filesystem::path rankingsDatabaseFilePath;
     static std::filesystem::path topPlaysDatabaseFilePath;
     static std::filesystem::path botConfigDatabaseFilePath;

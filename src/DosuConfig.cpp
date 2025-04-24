@@ -10,13 +10,12 @@
 #include <ctime>
 
 int DosuConfig::logLevel;
+bool DosuConfig::logAnsiColors;
 std::string DosuConfig::discordBotToken;
 std::string DosuConfig::osuClientID;
 std::string DosuConfig::osuClientSecret;
 int DosuConfig::scrapeRankingsRunHour;
 int DosuConfig::topPlaysRunHour;
-bool DosuConfig::scrapeRankingsParallel;
-bool DosuConfig::topPlaysParallel;
 std::filesystem::path DosuConfig::rankingsDatabaseFilePath;
 std::filesystem::path DosuConfig::topPlaysDatabaseFilePath;
 std::filesystem::path DosuConfig::botConfigDatabaseFilePath;
@@ -84,6 +83,7 @@ void DosuConfig::load(std::filesystem::path const& filePath)
         LOG_WARN("Configured ", k_logLevelKey, " is out of bounds! Setting to 1");
         DosuConfig::logLevel = 1;
     }
+    DosuConfig::logAnsiColors = configDataJson.at(k_logAnsiColorsKey);
     DosuConfig::discordBotToken = configDataJson.at(k_discordBotTokenKey);
     DosuConfig::discordBotStrings = configDataJson.at(k_discordBotStringsKey).get<std::map<std::string, std::string>>();
     DosuConfig::osuClientID = configDataJson.at(k_osuClientIdKey);
@@ -100,8 +100,6 @@ void DosuConfig::load(std::filesystem::path const& filePath)
         DosuConfig::topPlaysRunHour = DosuConfig::topPlaysRunHour % 24;
         LOG_WARN("Configured ", k_topPlaysRunHourKey, " is out of bounds! Normalizing to ", DosuConfig::topPlaysRunHour);
     }
-    DosuConfig::scrapeRankingsParallel = configDataJson.at(k_scrapeRankingsParallelKey);
-    DosuConfig::topPlaysParallel = configDataJson.at(k_topPlaysParallelKey);
     DosuConfig::rankingsDatabaseFilePath = std::filesystem::path(configDataJson.at(k_rankingsDbFilePathKey));
     DosuConfig::topPlaysDatabaseFilePath = std::filesystem::path(configDataJson.at(k_topPlaysDbFilePathKey));
     DosuConfig::botConfigDatabaseFilePath = std::filesystem::path(configDataJson.at(k_botConfigDbFilePathKey));
@@ -116,10 +114,9 @@ void DosuConfig::setupConfig(std::filesystem::path const& filePath)
 
     nlohmann::json newConfigJson;
     newConfigJson[k_logLevelKey] = 1;
+    newConfigJson[k_logAnsiColorsKey] = false;
     newConfigJson[k_scrapeRankingsRunHourKey] = utcToLocal(3);
     newConfigJson[k_topPlaysRunHourKey] = utcToLocal(1);
-    newConfigJson[k_scrapeRankingsParallelKey] = true;
-    newConfigJson[k_topPlaysParallelKey] = false;
 
     std::string botToken;
     std::string clientID;

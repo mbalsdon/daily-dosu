@@ -46,10 +46,6 @@ First-time setup will create a default configuration file at `dosu_config.json`.
 - **`SCRAPE_RANKINGS_RUN_HOUR`** - what hour of the day (local time) to run the Rank Increases script.
     - NOTE: By default, this is set to 3UTC for a few reasons. Mainly, because this is 1~2 hours before the osu! backend "flips over" to a new day. Changing this value might give you worse results (or better!).
 - **`TOP_PLAYS_RUN_HOUR`** - what hour of the day (local time) to run the Rank Increases script.
-- **`SCRAPE_RANKINGS_PARALLEL`** - whether to run the Rank Increases script in parallel execution mode or not.
-    - NOTE: By default this is turned on, so that we can grab user data in as small of a time frame as possible. Slower execution time means (possibly) less accurate results since a player might increase in rank after we pull their data but before we display it.
-- **`TOP_PLAYS_PARALLEL`** - whether to run the Top Plays script in parallel execution mode or not.
-    - NOTE: By default this is turned off, under the assumption that the Rank Increases script is turned on. Speed has no effect on data accuracy in this case, and we don't want to overload the osu! API.
 - **`DISCORD_BOT_STRINGS`** - maps osu! letter ranks (e.g. A, B, C) and mods (e.g. HD, DT, MR) to how they're displayed by the bot. You can use this to display custom emojis for each letter rank / mod by registering them with your discord bot and then copying in the respective markdown string. For example:
     - `"LETTER_RANK_X": "<:letterRank_X:1358102547339935946>"`
 

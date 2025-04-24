@@ -1,9 +1,9 @@
 - TODO
 --- https://osu.ppy.sh/docs/#get-users
+--- command map
+--- bulk global commands avoid ratelim
 
 - FUTURE
 --- bot/embedgen refactor; sort of atomic-design style (component based as much as we can; e.g. filter modals are perfect for this)
------ embedgenerator does not have to be a class btw (no state)?
---- threadpooling parallelized work, impl bot seq/par for all jobs
---- loading bar
+----- embedgenerator does not have to be a class btw (no state)
 --- new job: username changes in top X players

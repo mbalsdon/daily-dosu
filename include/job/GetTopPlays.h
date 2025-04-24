@@ -6,6 +6,6 @@
 
 #include <memory>
 
-void getTopPlays(std::shared_ptr<TokenManager> pTokenManager, std::shared_ptr<TopPlaysDatabase> pTopPlaysDb, bool bParallel);
+void getTopPlays(std::shared_ptr<TokenManager> pTokenManager, std::shared_ptr<TopPlaysDatabase> pTopPlaysDb);
 
 #endif /* __DAILY_TOP_PLAYS_H__ */

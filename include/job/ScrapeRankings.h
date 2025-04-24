@@ -6,6 +6,6 @@
 
 #include <memory>
 
-void scrapeRankings(std::shared_ptr<TokenManager> pTokenManager, std::shared_ptr<RankingsDatabase> pRankingsDb, bool bParallel);
+void scrapeRankings(std::shared_ptr<TokenManager> pTokenManager, std::shared_ptr<RankingsDatabase> pRankingsDb);
 
 #endif /* __SCRAPE_RANKINGS_H__ */
