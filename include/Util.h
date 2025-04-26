@@ -506,9 +506,9 @@ private:
             throw std::invalid_argument(reason);
         }
 
-        if (!std::all_of(modsStr.begin(), modsStr.end(), [](char c) { return std::isalpha(c) && std::isupper(c); }))
+        if (!std::all_of(modsStr.begin(), modsStr.end(), [](char c) { return (std::isalpha(c) && std::isupper(c)) || (std::isdigit(c)); }))
         {
-            std::string reason = "Input string must contain only uppercase alphabetical characters! modsStr=" + modsStr;
+            std::string reason = "Input string must contain only uppercase alphanumerical characters! modsStr=" + modsStr;
             throw std::invalid_argument(reason);
         }
     }

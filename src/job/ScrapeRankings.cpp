@@ -28,7 +28,7 @@ void processRankingsUsers(
     std::size_t const& end,
     Gamemode const& mode)
 {
-    LOG_INFO("Executing thread ", std::this_thread::get_id(), " for pages ", start, "-", end - 1, " for mode ", mode.toString());
+    LOG_DEBUG("Executing thread ", std::this_thread::get_id(), " for pages ", start, "-", end - 1, " for mode ", mode.toString());
     std::vector<RankingsUser> rankingsUsersChunk;
     OsuWrapper osu(pTokenManager, 0);
     for (Page page = start; page < end; ++page)
@@ -73,7 +73,7 @@ void processUsers(
     std::size_t const& end,
     Gamemode const& mode)
 {
-    LOG_INFO("Executing thread ", std::this_thread::get_id(), " for ", end - start, " users, for mode ", mode.toString());
+    LOG_DEBUG("Executing thread ", std::this_thread::get_id(), " for ", end - start, " users, for mode ", mode.toString());
     std::vector<std::pair<UserID, Rank>> remainingUserRanksChunk;
     OsuWrapper osu(pTokenManager, 0);
     for (std::size_t j = start; j < end; ++j)
@@ -99,7 +99,7 @@ void processUsers(
 void scrapeRankingsMode(std::shared_ptr<TokenManager> pTokenManager, std::shared_ptr<RankingsDatabase> pRankingsDb, Gamemode const& mode)
 {
     // Shift current rank to yesterday for any existing players
-    LOG_INFO("Shifting ", mode.toString(), " player current rank values to yesterday");
+    LOG_DEBUG("Shifting ", mode.toString(), " player current rank values to yesterday");
     pRankingsDb->shiftRanks(mode);
 
     // Get current top 10,000 players and update database with them
@@ -110,7 +110,7 @@ void scrapeRankingsMode(std::shared_ptr<TokenManager> pTokenManager, std::shared
     std::size_t numCallsPerThread = k_getRankingIDMaxPage / numCores;
     std::size_t numLeftoverCalls = k_getRankingIDMaxPage % numCores;
 
-    LOG_INFO("Hardware concurrency is ", numCores);
+    LOG_DEBUG("Hardware concurrency is ", numCores);
 
     std::mutex rankingsMtx;
     std::vector<std::thread> getRankingThreads;
@@ -151,15 +151,15 @@ void scrapeRankingsMode(std::shared_ptr<TokenManager> pTokenManager, std::shared
     }
 
     // Dump to database
-    LOG_INFO("Dumping ", mode.toString(), " player data to database");
+    LOG_DEBUG("Dumping ", mode.toString(), " player data to database");
     pRankingsDb->insertRankingsUsers(rankingsUsers, mode);
 
     // Remove any entry with null currentRank (means they dropped out of top 10k)
-    LOG_INFO("Removing ", mode.toString(), " players that dropped out of top 10k");
+    LOG_DEBUG("Removing ", mode.toString(), " players that dropped out of top 10k");
     pRankingsDb->deleteUsersWithNullCurrentRank(mode);
 
     // Fill in yesterdayRank for rows where it is NULL (means they entered top 10k)
-    LOG_INFO("Filling in data for ", mode.toString(), " players that entered top 10k");
+    LOG_DEBUG("Filling in data for ", mode.toString(), " players that entered top 10k");
     std::vector<UserID> remainingUserIDs = pRankingsDb->getUserIDsWithNullYesterdayRank(mode);
     std::size_t numRemainingUsers = remainingUserIDs.size();
 
@@ -209,7 +209,7 @@ void scrapeRankingsMode(std::shared_ptr<TokenManager> pTokenManager, std::shared
     }
 
     // Dump to database
-    LOG_INFO("Updating ", mode.toString(), " database with new player yesterday rank values");
+    LOG_DEBUG("Updating ", mode.toString(), " database with new player yesterday rank values");
     pRankingsDb->updateYesterdayRanks(remainingUserRanks, mode);
 }
 } /* namespace */
