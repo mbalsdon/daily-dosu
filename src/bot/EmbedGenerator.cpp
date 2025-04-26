@@ -317,7 +317,7 @@ namespace
     std::stringstream description;
     description << std::fixed << std::setprecision(2);
 
-    description << "## :medal: Top plays (#1 - #" << k_numTopPlays << "):\n";
+    description << "## :medal: Top plays:\n";
     addPlayersToTopPlaysDescription_(description, topPlays, mode);
 
     embed.set_description(description.str());
