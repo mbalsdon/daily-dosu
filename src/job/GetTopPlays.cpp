@@ -14,7 +14,6 @@ namespace
 void getTopPlaysMode(OsutrackWrapper& osutrack, OsuWrapper& osu, std::shared_ptr<TopPlaysDatabase> pTopPlaysDb, ISO8601DateTimeUTC const& now, Gamemode const& mode)
 {
     // Grab the top plays
-    LOG_INFO("Retrieving top ", k_numTopPlays, " ", mode.toString(), " plays from today");
     nlohmann::json bestPlaysArr;
     ISO8601DateTimeUTC yesterday = now;
     yesterday.addDays(-1);
@@ -34,7 +33,7 @@ void getTopPlaysMode(OsutrackWrapper& osutrack, OsuWrapper& osu, std::shared_ptr
     for (auto const& bestPlayObj : bestPlaysArr)
     {
         // Fill in data that osutrack gave us
-        TopPlay topPlay = {
+        TopPlay tp = {
             .rank = i++,
             .score = {
                 .performancePoints = bestPlayObj.at("pp").get<PerformancePoints>(),
@@ -50,9 +49,6 @@ void getTopPlaysMode(OsutrackWrapper& osutrack, OsuWrapper& osu, std::shared_ptr
             }
         };
 
-        topPlays.push_back(topPlay);
-        TopPlay& tp = topPlays.back();
-
         // Attempt to find osu!API data for the score by retrieving all of the user's scores on the beatmap and matching the date
         nlohmann::json userBeatmapScoresObj;
         LOG_ERROR_THROW(
@@ -63,7 +59,7 @@ void getTopPlaysMode(OsutrackWrapper& osutrack, OsuWrapper& osu, std::shared_ptr
         bool bFoundScore = false;
         for (auto const& userBeatmapScore : userBeatmapScoresObj["scores"])
         {
-            // If score time matches this is the play unless user is capable of temporal manipulation
+            // If score time matches this is the play
             if (tp.score.createdAt == ISO8601DateTimeUTC(userBeatmapScore.at("created_at").get<std::string>()))
             {
                 bFoundScore = true;
@@ -109,16 +105,18 @@ void getTopPlaysMode(OsutrackWrapper& osutrack, OsuWrapper& osu, std::shared_ptr
                 tp.score.beatmap.title = beatmapObj.at("beatmapset").at("title").get<BeatmapTitle>();
                 tp.score.beatmap.mapsetCreator = beatmapObj.at("beatmapset").at("creator").get<Username>();
                 tp.score.beatmap.starRating = beatmapObj.at("difficulty_rating").get<StarRating>();
+
+                topPlays.push_back(tp);
             }
         }
 
-        LOG_ERROR_THROW(
-            bFoundScore,
-            "Failed to find ", mode.toString(), " score set by user ", tp.score.user.userID, " on beatmap ", tp.score.beatmap.beatmapID
-        );
+        if (!bFoundScore)
+        {
+            LOG_WARN("Failed to find ", mode.toString(), " score set by user ", tp.score.user.userID, " on beatmap ", tp.score.beatmap.beatmapID, " - score was skipped");
+        }
     }
 
-    LOG_INFO("Populating database");
+    LOG_DEBUG("Populating database");
     pTopPlaysDb->insertTopPlays(mode, topPlays);
 }
 } /* namespace */
@@ -138,7 +136,7 @@ void getTopPlays(std::shared_ptr<TokenManager> pTokenManager, std::shared_ptr<To
     OsuWrapper osu(pTokenManager, 0);
     ISO8601DateTimeUTC now;
 
-    LOG_INFO("Wiping tables");
+    LOG_DEBUG("Wiping tables");
     pTopPlaysDb->wipeTables();
 
     // Do work for each mode
