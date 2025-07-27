@@ -1,5 +1,4 @@
 - TODO
---- https://osu.ppy.sh/docs/#get-users
 --- command map
 --- bulk global commands avoid ratelim
 

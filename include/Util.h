@@ -23,7 +23,7 @@
 
 constexpr int k_curlRetryWaitMs = 30000;
 
-constexpr std::size_t k_getRankingIDMaxNumIDs = 50;
+constexpr std::size_t k_batchMaxIDs = 50;
 constexpr std::size_t k_getRankingIDMaxPage = 200;
 
 constexpr std::size_t k_numDisplayUsersTop = 15;

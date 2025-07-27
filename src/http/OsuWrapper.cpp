@@ -3,6 +3,20 @@
 
 #include <thread>
 
+namespace
+{
+template<typename T>
+void appendBatchParams(std::vector<T> const& IDs, std::string& url /* out */)
+{
+    url += "?";
+    for (auto it = IDs.begin(); it != IDs.end(); ++it)
+    {
+        url += "ids[]=" + std::to_string(*it);
+        if (std::next(it) != IDs.end()) url += "&";
+    }
+}
+} /* namespace */
+
 /**
  * OsuWrapper constructor.
  */
@@ -40,6 +54,21 @@ bool OsuWrapper::getUser(UserID const& userID, Gamemode const& mode, nlohmann::j
 }
 
 /**
+ * Get osu! users for gamemode using their IDs.
+ */
+bool OsuWrapper::getUsers(std::vector<UserID> const& userIDs, Gamemode const& mode, nlohmann::json& users /* out */)
+{
+    LOG_DEBUG("Requesting data for ", userIDs.size(), " ", mode.toString(), " users");
+    LOG_ERROR_THROW(
+        userIDs.size() <= k_batchMaxIDs,
+        "Cannot request more than ", k_batchMaxIDs, " users at once! userIDs.size()=", userIDs.size()
+    );
+    std::string url = "https://osu.ppy.sh/api/v2/users";
+    appendBatchParams(userIDs, url);
+    return apiRequest_(url, "GET", {}, "", users);
+}
+
+/**
  * Get osu! user's scores on a beatmap for given gamemode.
  */
 bool OsuWrapper::getUserBeatmapScores(Gamemode const& mode, UserID const& userID, BeatmapID const& beatmapID, nlohmann::json& userBeatmapScores /* out */)
@@ -57,6 +86,18 @@ bool OsuWrapper::getBeatmap(BeatmapID const& beatmapID, nlohmann::json& beatmap 
     LOG_DEBUG("Requesting beatmap ", beatmapID);
     std::string url = "https://osu.ppy.sh/api/v2/beatmaps/" + std::to_string(beatmapID);
     return apiRequest_(url, "GET", {}, "", beatmap);
+}
+
+bool OsuWrapper::getBeatmaps(std::vector<BeatmapID> const& beatmapIDs, Gamemode const& mode, nlohmann::json& beatmaps /* out */)
+{
+    LOG_DEBUG("Requesting data for ", beatmapIDs.size(), " ", mode.toString(), " beatmaps");
+    LOG_ERROR_THROW(
+        beatmapIDs.size() <= k_batchMaxIDs,
+        "Cannot request more than ", k_batchMaxIDs, " beatmaps at once! beatmapIDs.size()=", beatmapIDs.size()
+    );
+    std::string url = "https://osu.ppy.sh/api/v2/beatmaps";
+    appendBatchParams(beatmapIDs, url);
+    return apiRequest_(url, "GET", {}, "", beatmaps);
 }
 
 /**

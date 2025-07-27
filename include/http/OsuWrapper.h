@@ -27,8 +27,10 @@ public:
 
     bool getRankings(Page page, Gamemode const& mode, nlohmann::json& rankings /* out */);
     bool getUser(UserID const& userID, Gamemode const& mode, nlohmann::json& user /* out */);
+    bool getUsers(std::vector<UserID> const& userIDs, Gamemode const& mode, nlohmann::json& users /* out */);
     bool getUserBeatmapScores(Gamemode const& mode, UserID const& userID, BeatmapID const& beatmapID, nlohmann::json& userBeatmapScores /* out */);
     bool getBeatmap(BeatmapID const& beatmapID, nlohmann::json& beatmap /* out */);
+    bool getBeatmaps(std::vector<BeatmapID> const& beatmapIDs, Gamemode const& mode, nlohmann::json& beatmaps /* out */);
 
 private:
     [[nodiscard]] bool apiRequest_(std::string const& url, std::string const& method, std::vector<std::string> headers, std::string const& body, nlohmann::json& responseDataJson /* out */);

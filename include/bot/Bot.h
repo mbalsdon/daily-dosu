@@ -71,6 +71,14 @@ private:
     std::shared_ptr<BotConfigDatabase> m_pBotConfigDb;
     std::atomic<bool> m_bIsInitialized;
 
+    const std::unordered_map<std::string, std::function<void(Bot*, const dpp::slashcommand_t&)>> m_kCommandMap = {
+        {k_cmdHelp, &Bot::cmdHelp_},
+        {k_cmdPing, &Bot::cmdPing_},
+        {k_cmdNewsletter, &Bot::cmdNewsletter_},
+        {k_cmdSubscribe, &Bot::cmdSubscribe_},
+        {k_cmdUnsubscribe, &Bot::cmdUnsubscribe_}
+    };
+
     std::unordered_map<dpp::snowflake, std::chrono::steady_clock::time_point> m_latestCommands;
     std::unordered_map<dpp::snowflake, std::chrono::steady_clock::time_point> m_latestInteractions;
     std::mutex m_latestCommandsMtx;

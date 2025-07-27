@@ -8,6 +8,7 @@
 #include <vector>
 #include <cstdint>
 #include <future>
+#include <unordered_map>
 #include <utility>
 
 #include <nlohmann/json.hpp>
@@ -15,7 +16,24 @@
 namespace
 {
 /**
- * Cross-reference osutrack best play with osu!API, and fill in missing information.
+ * Vector to string.
+ */
+template<typename T>
+std::string printVector(std::vector<T> v)
+{
+    std::string ret = "[";
+    for (auto it = v.begin(); it != v.end(); ++it)
+    {
+        ret += std::to_string(*it);
+        if (std::next(it) != v.end()) ret += ", ";
+    }
+    ret += "]";
+    return ret;
+}
+
+/**
+ * Cross-reference osutrack best play with osu!API.
+ * Return true if it was found, as well as the play with osutrack data + osu!API score data filled in.
  */
 std::pair<bool, TopPlay> findTopPlay(
     std::shared_ptr<TokenManager> pTokenManager,
@@ -69,39 +87,96 @@ std::pair<bool, TopPlay> findTopPlay(
                 tp.score.count50 = userBeatmapScore.at("statistics").at("count_50").get<HitCount>();
             }
             tp.score.countMiss = userBeatmapScore.at("statistics").at("count_miss").get<HitCount>();
-
-            // Get user data from osu!API and fill it in
-            nlohmann::json userObj;
-            LOG_ERROR_THROW(
-                osu.getUser(tp.score.user.userID, mode, userObj),
-                "Failed to get user! mode=", mode.toString(), ", userID=", tp.score.user.userID
-            );
-
-            tp.score.user.username = userObj.at("username").get<Username>();
-            tp.score.user.countryCode = userObj.at("country").at("code").get<CountryCode>();
-            tp.score.user.pfpLink = userObj.at("avatar_url").get<ProfilePicture>();
-            tp.score.user.performancePoints = userObj.at("statistics").at("pp").get<PerformancePoints>();
-            tp.score.user.accuracy = userObj.at("statistics").at("hit_accuracy").get<Accuracy>();
-            tp.score.user.hoursPlayed = static_cast<HoursPlayed>(userObj.at("statistics").at("play_time").get<uint64_t>() / 3600); // FIXME: round instead of trunc
-            tp.score.user.currentRank = userObj.at("statistics").at("global_rank").get<Rank>();
-
-            // Get beatmap data from osu!API and fill it in
-            nlohmann::json beatmapObj;
-            LOG_ERROR_THROW(
-                osu.getBeatmap(tp.score.beatmap.beatmapID, beatmapObj),
-                "Failed to get ", mode.toString(), " score ", tp.score.scoreID
-            );
-
-            tp.score.beatmap.maxCombo = beatmapObj.at("max_combo").get<Combo>();
-            tp.score.beatmap.difficultyName = beatmapObj.at("version").get<DifficultyName>();
-            tp.score.beatmap.artist = beatmapObj.at("beatmapset").at("artist").get<BeatmapArtist>();
-            tp.score.beatmap.title = beatmapObj.at("beatmapset").at("title").get<BeatmapTitle>();
-            tp.score.beatmap.mapsetCreator = beatmapObj.at("beatmapset").at("creator").get<Username>();
-            tp.score.beatmap.starRating = beatmapObj.at("difficulty_rating").get<StarRating>();
         }
     }
 
     return std::make_pair(bFoundScore, tp);
+}
+
+/**
+ * Fill in remaining fields for each play in given chunk.
+ */
+std::vector<TopPlay> fillInTopPlaysChunk(
+    std::shared_ptr<TokenManager> pTokenManager,
+    std::vector<TopPlay> topPlaysChunk,
+    Gamemode const& mode)
+{
+    OsuWrapper osu(pTokenManager, 0);
+
+    // Collect userIDs and beatmapIDs so that we can batch request
+    std::vector<UserID> userIDs;
+    userIDs.reserve(topPlaysChunk.size());
+    std::vector<BeatmapID> beatmapIDs;
+    beatmapIDs.reserve(topPlaysChunk.size());
+    for (auto const& topPlay : topPlaysChunk)
+    {
+        userIDs.push_back(topPlay.score.user.userID);
+        beatmapIDs.push_back(topPlay.score.beatmap.beatmapID);
+    }
+
+    // Do batch requests
+    nlohmann::json usersArr;
+    nlohmann::json beatmapsArr;
+    LOG_ERROR_THROW(
+        osu.getUsers(userIDs, mode, usersArr),
+        "Failed to get users! userIDs=", printVector(userIDs), ", mode=", mode.toString()
+    );
+    LOG_ERROR_THROW(
+        osu.getBeatmaps(beatmapIDs, mode, beatmapsArr),
+        "Failed to get beatmaps! beatmapIDs=", printVector(beatmapIDs), ", mode=", mode.toString()
+    );
+
+    // Fill in missing data
+    // We can't rely on ordering since osu!API batch requests return sets (no duplicates)
+    std::unordered_map<UserID, nlohmann::json> userMap;
+    std::unordered_map<BeatmapID, nlohmann::json> beatmapMap;
+    for (auto const& userObj : usersArr.at("users"))
+    {
+        userMap[userObj.at("id")] = userObj;
+    }
+    for (auto const& beatmapObj : beatmapsArr.at("beatmaps"))
+    {
+        beatmapMap[beatmapObj.at("id")] = beatmapObj;
+    }
+
+    std::vector<TopPlay> completedTopPlays;
+    completedTopPlays.reserve(topPlaysChunk.size());
+    for (auto const& topPlay : topPlaysChunk)
+    {
+        auto userIt = userMap.find(topPlay.score.user.userID);
+        LOG_ERROR_THROW(
+            userIt != userMap.end(),
+            "Failed to find userID ", topPlay.score.user.userID, " in userMap!"
+        );
+        auto beatmapIt = beatmapMap.find(topPlay.score.beatmap.beatmapID);
+        LOG_ERROR_THROW(
+            beatmapIt != beatmapMap.end(),
+            "Failed to find beatmapID ", topPlay.score.beatmap.beatmapID, " in beatmapMap!"
+        );
+
+        nlohmann::json userObj = userIt->second;
+        nlohmann::json beatmapObj = beatmapIt->second;
+        TopPlay completedTopPlay = topPlay;
+
+        completedTopPlay.score.user.username = userObj.at("username").get<Username>();
+        completedTopPlay.score.user.countryCode = userObj.at("country_code").get<CountryCode>();
+        completedTopPlay.score.user.pfpLink = userObj.at("avatar_url").get<ProfilePicture>();
+        completedTopPlay.score.user.performancePoints = userObj.at("statistics_rulesets").at(mode.toString()).at("pp").get<PerformancePoints>();
+        completedTopPlay.score.user.accuracy = userObj.at("statistics_rulesets").at(mode.toString()).at("hit_accuracy").get<Accuracy>();
+        completedTopPlay.score.user.hoursPlayed = static_cast<HoursPlayed>(userObj.at("statistics_rulesets").at(mode.toString()).at("play_time").get<uint64_t>() / 3600); // FIXME: round instead of trunc
+        completedTopPlay.score.user.currentRank = userObj.at("statistics_rulesets").at(mode.toString()).at("global_rank").get<Rank>();
+
+        completedTopPlay.score.beatmap.maxCombo = beatmapObj.at("max_combo").get<Combo>();
+        completedTopPlay.score.beatmap.difficultyName = beatmapObj.at("version").get<DifficultyName>();
+        completedTopPlay.score.beatmap.artist = beatmapObj.at("beatmapset").at("artist").get<BeatmapArtist>();
+        completedTopPlay.score.beatmap.title = beatmapObj.at("beatmapset").at("title").get<BeatmapTitle>();
+        completedTopPlay.score.beatmap.mapsetCreator = beatmapObj.at("beatmapset").at("creator").get<Username>();
+        completedTopPlay.score.beatmap.starRating = beatmapObj.at("difficulty_rating").get<StarRating>();
+
+        completedTopPlays.push_back(completedTopPlay);
+    }
+
+    return completedTopPlays;
 }
 
 /**
@@ -127,7 +202,7 @@ void getTopPlaysMode(
         "Expected at most ", k_numTopPlays, " plays from osu!track but got ", bestPlaysArr.size()
     );
 
-    // Process each play
+    // Try to find each top play in the osu!API
     int64_t i = 1;
     std::vector<TopPlay> topPlays;
     topPlays.reserve(k_numTopPlays);
@@ -151,13 +226,38 @@ void getTopPlaysMode(
         topPlays.push_back(tp);
     }
 
-    pTopPlaysDb->insertTopPlays(mode, topPlays);
+    // Fill in any missing information using osu!API
+    std::vector<TopPlay> completeTopPlays;
+    completeTopPlays.reserve(topPlays.size());
+
+    std::vector<std::future<std::vector<TopPlay>>> completeTopPlaysChunkFutures;
+    std::size_t numChunks = (topPlays.size() + k_batchMaxIDs - 1) / k_batchMaxIDs;
+    completeTopPlaysChunkFutures.reserve(numChunks);
+    for (std::size_t j = 0; j < topPlays.size(); j += k_batchMaxIDs)
+    {
+        std::size_t endIdx = std::min(j + k_batchMaxIDs, topPlays.size());
+        auto beginIt = topPlays.begin();
+        std::advance(beginIt, j);
+        auto endIt = topPlays.begin();
+        std::advance(endIt, endIdx);
+        std::vector<TopPlay> topPlaysChunk(beginIt, endIt);
+        auto futureCompleteTopPlaysChunk = std::async(std::launch::async, fillInTopPlaysChunk, pTokenManager, topPlaysChunk, mode);
+        completeTopPlaysChunkFutures.push_back(std::move(futureCompleteTopPlaysChunk));
+    }
+
+    for (auto& futureCompleteTopPlaysChunk : completeTopPlaysChunkFutures)
+    {
+        auto completeTopPlaysChunk = futureCompleteTopPlaysChunk.get();
+        completeTopPlays.insert(completeTopPlays.end(), std::make_move_iterator(completeTopPlaysChunk.begin()), std::make_move_iterator(completeTopPlaysChunk.end()));
+    }
+
+    pTopPlaysDb->insertTopPlays(mode, completeTopPlays);
 }
 } /* namespace */
 
 /**
  * Get daily top plays for each mode.
- * Makes 4 osutrack API calls and up to 3*k_numTopPlays osu!API calls.
+ * Makes 4 osutrack API calls and up to [4 * k_numTopPlays + 8 * ceil(k_numTopPlays / 50)] osu!API calls.
  */
 void getTopPlays(std::shared_ptr<TokenManager> pTokenManager, std::shared_ptr<TopPlaysDatabase> pTopPlaysDb)
 {
