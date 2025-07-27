@@ -1,8 +1,3 @@
-- TODO
---- https://osu.ppy.sh/docs/#get-users
---- command map
---- bulk global commands avoid ratelim
-
 - FUTURE
 --- bot/embedgen refactor; sort of atomic-design style (component based as much as we can; e.g. filter modals are perfect for this)
 ----- embedgenerator does not have to be a class btw (no state)

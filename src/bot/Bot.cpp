@@ -219,11 +219,14 @@ void Bot::onReady_(dpp::ready_t const&)
         unsubscribeOption.add_choice(dpp::command_option_choice(k_newsletterPageOptionTopPlays.first, k_newsletterPageOptionTopPlays.second));
         unsubscribeSlashCommand.add_option(unsubscribeOption);
 
-        m_bot.global_command_create(dpp::slashcommand(k_cmdHelp, k_cmdHelpDesc, m_bot.me.id));
-        m_bot.global_command_create(dpp::slashcommand(k_cmdPing, k_cmdPingDesc, m_bot.me.id));
-        m_bot.global_command_create(newsletterSlashCommand);
-        m_bot.global_command_create(subscribeSlashCommand);
-        m_bot.global_command_create(unsubscribeSlashCommand);
+        std::vector<dpp::slashcommand> commands = {
+            dpp::slashcommand(k_cmdHelp, k_cmdHelpDesc, m_bot.me.id),
+            dpp::slashcommand(k_cmdPing, k_cmdPingDesc, m_bot.me.id),
+            newsletterSlashCommand,
+            subscribeSlashCommand,
+            unsubscribeSlashCommand
+        };
+        m_bot.global_bulk_command_create(commands);
     }
 }
 
@@ -254,25 +257,10 @@ void Bot::onSlashCommand_(dpp::slashcommand_t const& event)
     }
 
     // Route command
-    if (cmdName == k_cmdHelp)
+    auto it = m_kCommandMap.find(cmdName);
+    if (it != m_kCommandMap.end())
     {
-        cmdHelp_(event);
-    }
-    else if (cmdName == k_cmdPing)
-    {
-        cmdPing_(event);
-    }
-    else if (cmdName == k_cmdNewsletter)
-    {
-        cmdNewsletter_(event);
-    }
-    else if (cmdName == k_cmdSubscribe)
-    {
-        cmdSubscribe_(event);
-    }
-    else if (cmdName == k_cmdUnsubscribe)
-    {
-        cmdUnsubscribe_(event);
+        it->second(this, event);
     }
     else
     {

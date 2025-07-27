@@ -82,7 +82,7 @@ void scrapeRankingsMode(
 
     // Get current top 10,000 players and update database with them
     std::vector<RankingsUser> rankingsUsers;
-    rankingsUsers.reserve(k_getRankingIDMaxPage * k_getRankingIDMaxNumIDs);
+    rankingsUsers.reserve(k_getRankingIDMaxPage * k_batchMaxIDs);
 
     std::vector<std::future<std::vector<RankingsUser>>> rankingsUsersFutures;
     rankingsUsersFutures.reserve(k_getRankingIDMaxPage);
