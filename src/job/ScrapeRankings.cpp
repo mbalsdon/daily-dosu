@@ -34,17 +34,25 @@ std::vector<RankingsUser> getRankingsUsersChunk(
     nlohmann::json rankings = rankingsObj["ranking"];
     for (auto const& userStatistics : rankings)
     {
-        RankingsUser rankingsUser = {
-            .userID = userStatistics.at("user").at("id").get<UserID>(),
-            .username = userStatistics.at("user").at("username").get<Username>(),
-            .countryCode = userStatistics.at("user").at("country_code").get<CountryCode>(),
-            .pfpLink = userStatistics.at("user").at("avatar_url").get<ProfilePicture>(),
-            .performancePoints = userStatistics.at("pp").get<PerformancePoints>(),
-            .accuracy = userStatistics.at("hit_accuracy").get<Accuracy>(),
-            .hoursPlayed = static_cast<HoursPlayed>(userStatistics.at("play_time").get<uint64_t>() / 3600), // FIXME: round instead of trunc
-            .currentRank = userStatistics.at("global_rank").get<Rank>()
-        };
-        rankingsUsersChunk.push_back(rankingsUser);
+        try
+        {
+            RankingsUser rankingsUser = {
+                .userID = userStatistics.at("user").at("id").get<UserID>(),
+                .username = userStatistics.at("user").at("username").get<Username>(),
+                .countryCode = userStatistics.at("user").at("country_code").get<CountryCode>(),
+                .pfpLink = userStatistics.at("user").at("avatar_url").get<ProfilePicture>(),
+                .performancePoints = userStatistics.at("pp").get<PerformancePoints>(),
+                .accuracy = userStatistics.at("hit_accuracy").get<Accuracy>(),
+                .hoursPlayed = static_cast<HoursPlayed>(userStatistics.at("play_time").get<uint64_t>() / 3600), // FIXME: round instead of trunc
+                .currentRank = userStatistics.at("global_rank").get<Rank>()
+            };
+            rankingsUsersChunk.push_back(rankingsUser);
+        }
+        catch (nlohmann::json::exception const& e)
+        {
+            LOG_ERROR("User statistics object contains missing or unexpected fields - skipping");
+            continue;
+        }
     }
 
     return rankingsUsersChunk;
@@ -75,6 +83,7 @@ std::pair<UserID, Rank> getUserYesterdayRank(
 void scrapeRankingsMode(
     std::shared_ptr<TokenManager> pTokenManager,
     std::shared_ptr<RankingsDatabase> pRankingsDb,
+    std::shared_ptr<ThreadPool> pThreadPool,
     Gamemode const& mode)
 {
     // Shift current rank to yesterday for any existing players
@@ -89,7 +98,7 @@ void scrapeRankingsMode(
 
     for (Page i = 0; i < k_getRankingIDMaxPage; ++i)
     {
-        auto futureRankingsUsersChunk = std::async(std::launch::async, getRankingsUsersChunk, pTokenManager, i, mode);
+        auto futureRankingsUsersChunk = pThreadPool->submit(getRankingsUsersChunk, pTokenManager, i, mode);
         rankingsUsersFutures.push_back(std::move(futureRankingsUsersChunk));
     }
 
@@ -115,7 +124,7 @@ void scrapeRankingsMode(
 
     for (const auto& remainingUserID : remainingUserIDs)
     {
-        auto futureRemainingUserYesterdayRank = std::async(std::launch::async, getUserYesterdayRank, pTokenManager, remainingUserID, mode);
+        auto futureRemainingUserYesterdayRank = pThreadPool->submit(getUserYesterdayRank, pTokenManager, remainingUserID, mode);
         remainingUserYesterdayRankFutures.push_back(std::move(futureRemainingUserYesterdayRank));
     }
 
@@ -136,7 +145,10 @@ void scrapeRankingsMode(
  * Get data for current top 10000 players in each mode. If the last run was (roughly) a day ago, this
  * script will make a bit over ~800 osu!API calls. Otherwise, it will make 40,800 calls.
  */
-void scrapeRankings(std::shared_ptr<TokenManager> pTokenManager, std::shared_ptr<RankingsDatabase> pRankingsDb)
+void scrapeRankings(
+    std::shared_ptr<TokenManager> pTokenManager,
+    std::shared_ptr<RankingsDatabase> pRankingsDb,
+    std::shared_ptr<ThreadPool> pThreadPool)
 {
     LOG_INFO("Scraping osu! rankings");
 
@@ -150,9 +162,12 @@ void scrapeRankings(std::shared_ptr<TokenManager> pTokenManager, std::shared_ptr
         pRankingsDb->wipeTables();
     }
 
+    // Update the token so that all the concurrent threads don't spin on it later
+    pTokenManager->updateAccessToken();
+
     // Do work for each mode
-    scrapeRankingsMode(pTokenManager, pRankingsDb, Gamemode::Osu);
-    scrapeRankingsMode(pTokenManager, pRankingsDb, Gamemode::Taiko);
-    scrapeRankingsMode(pTokenManager, pRankingsDb, Gamemode::Mania);
-    scrapeRankingsMode(pTokenManager, pRankingsDb, Gamemode::Catch);
+    scrapeRankingsMode(pTokenManager, pRankingsDb, pThreadPool, Gamemode::Osu);
+    scrapeRankingsMode(pTokenManager, pRankingsDb, pThreadPool, Gamemode::Taiko);
+    scrapeRankingsMode(pTokenManager, pRankingsDb, pThreadPool, Gamemode::Mania);
+    scrapeRankingsMode(pTokenManager, pRankingsDb, pThreadPool, Gamemode::Catch);
 }

@@ -207,7 +207,7 @@ namespace
         .set_color(k_helpColor)
         .set_footer(
             dpp::embed_footer()
-            .set_text("https://github.com/mbalsdon/daily-dosu")
+            .set_text("https://ko-fi.com/spreadnuts")
         );
 
     std::stringstream description;
@@ -239,7 +239,7 @@ namespace
     std::string footerIcon = k_twemojiClockPrefix + toHexString(convertTo12Hour(utcHour) - 1) + k_twemojiClockSuffix;
 
     dpp::embed embed = dpp::embed()
-        .set_author("Here's your daily dose of osu!", "https://github.com/mbalsdon/daily-dosu", k_iconImgUrl) // zesty ahh bot
+        .set_author("Here's your daily dose of osu!", "https://ko-fi.com/spreadnuts", k_iconImgUrl) // zesty ahh bot
         .set_timestamp(time(0))
         .set_footer(
             dpp::embed_footer()
@@ -294,7 +294,7 @@ namespace
     std::string footerIcon = k_twemojiClockPrefix + toHexString(convertTo12Hour(utcHour) - 1) + k_twemojiClockSuffix;
 
     dpp::embed embed = dpp::embed()
-        .set_author("Here's your daily dose of osu!", "https://github.com/mbalsdon/daily-dosu", k_iconImgUrl)
+        .set_author("Here's your daily dose of osu!", "https://ko-fi.com/spreadnuts", k_iconImgUrl)
         .set_timestamp(time(0))
         .set_color(k_topPlaysColor)
         .set_footer(

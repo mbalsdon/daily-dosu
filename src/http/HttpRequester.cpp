@@ -87,10 +87,22 @@ HttpRequester::~HttpRequester() noexcept
     curl_easy_setopt(m_curlHandle, CURLOPT_USERAGENT, "daily-dosu");
     curl_easy_setopt(m_curlHandle, CURLOPT_FOLLOWLOCATION, 1L);
     curl_easy_setopt(m_curlHandle, CURLOPT_MAXREDIRS, 10L);
-    curl_easy_setopt(m_curlHandle, CURLOPT_TIMEOUT, 30L);
+    curl_easy_setopt(m_curlHandle, CURLOPT_TIMEOUT, 120L);
+    curl_easy_setopt(m_curlHandle, CURLOPT_CONNECTTIMEOUT, 30L);
+    curl_easy_setopt(m_curlHandle, CURLOPT_NOSIGNAL, 1L);
+
+    curl_easy_setopt(m_curlHandle, CURLOPT_TCP_KEEPALIVE, 1L);
+    curl_easy_setopt(m_curlHandle, CURLOPT_TCP_KEEPIDLE, 120L);
+    curl_easy_setopt(m_curlHandle, CURLOPT_TCP_KEEPINTVL, 60L);
+
+    curl_easy_setopt(m_curlHandle, CURLOPT_LOW_SPEED_LIMIT, 100L);
+    curl_easy_setopt(m_curlHandle, CURLOPT_LOW_SPEED_TIME, 60L);
+
     curl_easy_setopt(m_curlHandle, CURLOPT_SSLVERSION, CURL_SSLVERSION_TLSv1_2);
     curl_easy_setopt(m_curlHandle, CURLOPT_SSL_VERIFYPEER, 1L);
     curl_easy_setopt(m_curlHandle, CURLOPT_SSL_VERIFYHOST, 2L);
+
+    curl_easy_setopt(m_curlHandle, CURLOPT_DNS_SERVERS, "1.1.1.1,8.8.8.8");
 
     CURLcode curlResponse = curl_easy_perform(m_curlHandle);
 

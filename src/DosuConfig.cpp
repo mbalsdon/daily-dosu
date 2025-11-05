@@ -8,6 +8,7 @@
 #include <iostream>
 #include <chrono>
 #include <ctime>
+#include <thread>
 
 int DosuConfig::logLevel;
 bool DosuConfig::logAnsiColors;
@@ -16,6 +17,7 @@ std::string DosuConfig::osuClientID;
 std::string DosuConfig::osuClientSecret;
 int DosuConfig::scrapeRankingsRunHour;
 int DosuConfig::topPlaysRunHour;
+int DosuConfig::threadCount;
 std::filesystem::path DosuConfig::rankingsDatabaseFilePath;
 std::filesystem::path DosuConfig::topPlaysDatabaseFilePath;
 std::filesystem::path DosuConfig::botConfigDatabaseFilePath;
@@ -100,6 +102,12 @@ void DosuConfig::load(std::filesystem::path const& filePath)
         DosuConfig::topPlaysRunHour = DosuConfig::topPlaysRunHour % 24;
         LOG_WARN("Configured ", k_topPlaysRunHourKey, " is out of bounds! Normalizing to ", DosuConfig::topPlaysRunHour);
     }
+    DosuConfig::threadCount = configDataJson.at(k_threadCountKey);
+    if (DosuConfig::threadCount < 1)
+    {
+        DosuConfig::threadCount = static_cast<int>(std::thread::hardware_concurrency());
+        LOG_WARN("Configured ", k_threadCountKey, " is out of bounds! Setting to ", DosuConfig::threadCount);
+    }
     DosuConfig::rankingsDatabaseFilePath = std::filesystem::path(configDataJson.at(k_rankingsDbFilePathKey));
     DosuConfig::topPlaysDatabaseFilePath = std::filesystem::path(configDataJson.at(k_topPlaysDbFilePathKey));
     DosuConfig::botConfigDatabaseFilePath = std::filesystem::path(configDataJson.at(k_botConfigDbFilePathKey));
@@ -108,7 +116,7 @@ void DosuConfig::load(std::filesystem::path const& filePath)
 /**
  * Create config from user input.
  */
-void DosuConfig::setupConfig(std::filesystem::path const& filePath)
+void DosuConfig::setupConfig(std::filesystem::path const& filePath, std::atomic<bool> const& bShutdown)
 {
     LOG_DEBUG("Running config setup tool");
 
@@ -122,13 +130,26 @@ void DosuConfig::setupConfig(std::filesystem::path const& filePath)
     std::string clientID;
     std::string clientSecret;
 
+    std::cout << "      _       _ _                 _                 " << std::endl;
+    std::cout << "   __| | __ _(_) |_   _        __| | ___  ___ _   _ " << std::endl;
+    std::cout << "  / _` |/ _` | | | | | |_____ / _` |/ _ \\/ __| | | |" << std::endl;
+    std::cout << " | (_| | (_| | | | |_| |_____| (_| | (_) \\__ \\ |_| |" << std::endl;
+    std::cout << "  \\__,_|\\__,_|_|_|\\__, |      \\__,_|\\___/|___/\\__,_|" << std::endl;
+    std::cout << "                  |___/                             " << std::endl;
+
     std::cout << "In order to run this bot, you will need to register a Discord application and an osu!API client." << std::endl;
+
     std::cout << "Enter Discord bot token: ";
     std::getline(std::cin, botToken);
+    if (bShutdown.load()) return;
+
     std::cout << "Enter osu!API client ID: ";
     std::getline(std::cin, clientID);
+    if (bShutdown.load()) return;
+
     std::cout << "Enter osu!API client secret: ";
     std::getline(std::cin, clientSecret);
+    if (bShutdown.load()) return;
 
     newConfigJson[k_discordBotTokenKey] = botToken;
     newConfigJson[k_osuClientIdKey] = clientID;
@@ -136,6 +157,7 @@ void DosuConfig::setupConfig(std::filesystem::path const& filePath)
     newConfigJson[k_rankingsDbFilePathKey] = k_dataDir / "rankings.db";
     newConfigJson[k_topPlaysDbFilePathKey] = k_dataDir / "top_plays.db";
     newConfigJson[k_botConfigDbFilePathKey] = k_dataDir / "bot_config.db";
+    newConfigJson[k_threadCountKey] = static_cast<int>(std::thread::hardware_concurrency());
 
     nlohmann::json defaultDiscordBotStrings;
     defaultDiscordBotStrings[k_letterRankXKey]  = "X";

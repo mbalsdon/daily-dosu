@@ -158,20 +158,36 @@ std::vector<TopPlay> fillInTopPlaysChunk(
         nlohmann::json beatmapObj = beatmapIt->second;
         TopPlay completedTopPlay = topPlay;
 
-        completedTopPlay.score.user.username = userObj.at("username").get<Username>();
-        completedTopPlay.score.user.countryCode = userObj.at("country_code").get<CountryCode>();
-        completedTopPlay.score.user.pfpLink = userObj.at("avatar_url").get<ProfilePicture>();
-        completedTopPlay.score.user.performancePoints = userObj.at("statistics_rulesets").at(mode.toString()).at("pp").get<PerformancePoints>();
-        completedTopPlay.score.user.accuracy = userObj.at("statistics_rulesets").at(mode.toString()).at("hit_accuracy").get<Accuracy>();
-        completedTopPlay.score.user.hoursPlayed = static_cast<HoursPlayed>(userObj.at("statistics_rulesets").at(mode.toString()).at("play_time").get<uint64_t>() / 3600); // FIXME: round instead of trunc
-        completedTopPlay.score.user.currentRank = userObj.at("statistics_rulesets").at(mode.toString()).at("global_rank").get<Rank>();
+        try
+        {
+            completedTopPlay.score.user.username = userObj.at("username").get<Username>();
+            completedTopPlay.score.user.countryCode = userObj.at("country_code").get<CountryCode>();
+            completedTopPlay.score.user.pfpLink = userObj.at("avatar_url").get<ProfilePicture>();
+            completedTopPlay.score.user.performancePoints = userObj.at("statistics_rulesets").at(mode.toString()).at("pp").get<PerformancePoints>();
+            completedTopPlay.score.user.accuracy = userObj.at("statistics_rulesets").at(mode.toString()).at("hit_accuracy").get<Accuracy>();
+            completedTopPlay.score.user.hoursPlayed = static_cast<HoursPlayed>(userObj.at("statistics_rulesets").at(mode.toString()).at("play_time").get<uint64_t>() / 3600); // FIXME: round instead of trunc
+            completedTopPlay.score.user.currentRank = userObj.at("statistics_rulesets").at(mode.toString()).at("global_rank").get<Rank>();
+        }
+        catch (nlohmann::json::exception const& e)
+        {
+            LOG_ERROR("Object for user ", topPlay.score.user.userID, " contains missing or unexpected fields - skipping");
+            continue;
+        }
 
-        completedTopPlay.score.beatmap.maxCombo = beatmapObj.at("max_combo").get<Combo>();
-        completedTopPlay.score.beatmap.difficultyName = beatmapObj.at("version").get<DifficultyName>();
-        completedTopPlay.score.beatmap.artist = beatmapObj.at("beatmapset").at("artist").get<BeatmapArtist>();
-        completedTopPlay.score.beatmap.title = beatmapObj.at("beatmapset").at("title").get<BeatmapTitle>();
-        completedTopPlay.score.beatmap.mapsetCreator = beatmapObj.at("beatmapset").at("creator").get<Username>();
-        completedTopPlay.score.beatmap.starRating = beatmapObj.at("difficulty_rating").get<StarRating>();
+        try
+        {
+            completedTopPlay.score.beatmap.maxCombo = beatmapObj.at("max_combo").get<Combo>();
+            completedTopPlay.score.beatmap.difficultyName = beatmapObj.at("version").get<DifficultyName>();
+            completedTopPlay.score.beatmap.artist = beatmapObj.at("beatmapset").at("artist").get<BeatmapArtist>();
+            completedTopPlay.score.beatmap.title = beatmapObj.at("beatmapset").at("title").get<BeatmapTitle>();
+            completedTopPlay.score.beatmap.mapsetCreator = beatmapObj.at("beatmapset").at("creator").get<Username>();
+            completedTopPlay.score.beatmap.starRating = beatmapObj.at("difficulty_rating").get<StarRating>();
+        }
+        catch (nlohmann::json::exception const& e)
+        {
+            LOG_ERROR("Object for beatmap ", topPlay.score.beatmap.beatmapID, " contains missing or unexpected fields - skipping");
+            continue;
+        }
 
         completedTopPlays.push_back(completedTopPlay);
     }
@@ -186,6 +202,7 @@ void getTopPlaysMode(
     OsutrackWrapper& osutrack,
     std::shared_ptr<TokenManager> pTokenManager,
     std::shared_ptr<TopPlaysDatabase> pTopPlaysDb,
+    std::shared_ptr<ThreadPool> pThreadPool,
     ISO8601DateTimeUTC const& now,
     Gamemode const& mode)
 {
@@ -211,7 +228,7 @@ void getTopPlaysMode(
     topPlayFutures.reserve(bestPlaysArr.size());
     for (auto const& bestPlayObj : bestPlaysArr)
     {
-        auto futureTopPlay = std::async(std::launch::async, findTopPlay, pTokenManager, i++, bestPlayObj, mode);
+        auto futureTopPlay = pThreadPool->submit(findTopPlay, pTokenManager, i++, bestPlayObj, mode);
         topPlayFutures.push_back(std::move(futureTopPlay));
     }
 
@@ -241,7 +258,7 @@ void getTopPlaysMode(
         auto endIt = topPlays.begin();
         std::advance(endIt, endIdx);
         std::vector<TopPlay> topPlaysChunk(beginIt, endIt);
-        auto futureCompleteTopPlaysChunk = std::async(std::launch::async, fillInTopPlaysChunk, pTokenManager, topPlaysChunk, mode);
+        auto futureCompleteTopPlaysChunk = pThreadPool->submit(fillInTopPlaysChunk, pTokenManager, topPlaysChunk, mode);
         completeTopPlaysChunkFutures.push_back(std::move(futureCompleteTopPlaysChunk));
     }
 
@@ -259,7 +276,10 @@ void getTopPlaysMode(
  * Get daily top plays for each mode.
  * Makes 4 osutrack API calls and up to [4 * k_numTopPlays + 8 * ceil(k_numTopPlays / 50)] osu!API calls.
  */
-void getTopPlays(std::shared_ptr<TokenManager> pTokenManager, std::shared_ptr<TopPlaysDatabase> pTopPlaysDb)
+void getTopPlays(
+    std::shared_ptr<TokenManager> pTokenManager,
+    std::shared_ptr<TopPlaysDatabase> pTopPlaysDb,
+    std::shared_ptr<ThreadPool> pThreadPool)
 {
     LOG_INFO("Grabbing top plays of the day");
 
@@ -268,9 +288,12 @@ void getTopPlays(std::shared_ptr<TokenManager> pTokenManager, std::shared_ptr<To
 
     pTopPlaysDb->wipeTables();
 
+    // Update the token so that all the concurrent threads don't spin on it later
+    pTokenManager->updateAccessToken();
+
     // Do work for each mode
-    getTopPlaysMode(osutrack, pTokenManager, pTopPlaysDb, now, Gamemode::Osu);
-    getTopPlaysMode(osutrack, pTokenManager, pTopPlaysDb, now, Gamemode::Taiko);
-    getTopPlaysMode(osutrack, pTokenManager, pTopPlaysDb, now, Gamemode::Mania);
-    getTopPlaysMode(osutrack, pTokenManager, pTopPlaysDb, now, Gamemode::Catch);
+    getTopPlaysMode(osutrack, pTokenManager, pTopPlaysDb, pThreadPool, now, Gamemode::Osu);
+    getTopPlaysMode(osutrack, pTokenManager, pTopPlaysDb, pThreadPool, now, Gamemode::Taiko);
+    getTopPlaysMode(osutrack, pTokenManager, pTopPlaysDb, pThreadPool, now, Gamemode::Mania);
+    getTopPlaysMode(osutrack, pTokenManager, pTopPlaysDb, pThreadPool, now, Gamemode::Catch);
 }

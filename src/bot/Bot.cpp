@@ -1,6 +1,5 @@
 #include "Bot.h"
 #include "Logger.h"
-#include "DosuConfig.h"
 
 #include <iostream>
 #include <fstream>
@@ -496,6 +495,10 @@ void Bot::onFormSubmit_(dpp::form_submit_t const& event)
         if (modsInputNormalized == "NM")
         {
             modsInputNormalized = "";
+        }
+        if (modsInputNormalized.length() % 2 != 0)
+        {
+            modsInputNormalized.pop_back();
         }
 
         OsuMods mods(modsInputNormalized);

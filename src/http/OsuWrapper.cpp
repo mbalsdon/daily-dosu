@@ -149,7 +149,7 @@ bool OsuWrapper::apiRequest_(std::string const& url, std::string const& method, 
         // 401 Unauthorized -> refresh token
         else if (httpCode == 401)
         {
-            LOG_WARN("Got 401, refreshing OAuth token");
+            LOG_DEBUG("Got 401, attempting to refresh OAuth token");
             m_pTokenManager->updateAccessToken();
             continue;
         }

@@ -9,6 +9,7 @@
 #include "TopPlaysDatabase.h"
 #include "BotConfigDatabase.h"
 #include "TokenManager.h"
+#include "ThreadPool.h"
 
 #include <curl/curl.h>
 
@@ -19,6 +20,7 @@
 #include <csignal>
 #include <memory>
 #include <condition_variable>
+#include <thread>
 
 namespace
 {
@@ -75,7 +77,7 @@ int main() noexcept
         if (!std::filesystem::exists(k_dosuConfigFilePath))
         {
             LOG_WARN("Cannot find config file! Running setup tool");
-            DosuConfig::setupConfig(k_dosuConfigFilePath);
+            DosuConfig::setupConfig(k_dosuConfigFilePath, g_bShutdown);
             return 0;
         }
         DosuConfig::load(k_dosuConfigFilePath);
@@ -100,16 +102,17 @@ int main() noexcept
         pBot->start();
 
         // Initialize jobs
+        std::shared_ptr<ThreadPool> pThreadPool = std::make_shared<ThreadPool>(DosuConfig::threadCount);
         std::unique_ptr<DailyJob> pScrapeRankingsJob = std::make_unique<DailyJob>(
             DosuConfig::scrapeRankingsRunHour,
             "scrapeRankings",
-            [&pTokenManager, &pRankingsDatabase]() { scrapeRankings(pTokenManager, pRankingsDatabase); },
+            [&pTokenManager, &pRankingsDatabase, &pThreadPool]() { scrapeRankings(pTokenManager, pRankingsDatabase, pThreadPool); },
             [&pBot]() { pBot->scrapeRankingsCallback(); }
         );
         std::unique_ptr<DailyJob> pTopPlaysJob = std::make_unique<DailyJob>(
             DosuConfig::topPlaysRunHour,
             "getTopPlays",
-            [&pTokenManager, &pTopPlaysDatabase]() { getTopPlays(pTokenManager, pTopPlaysDatabase); },
+            [&pTokenManager, &pTopPlaysDatabase, &pThreadPool]() { getTopPlays(pTokenManager, pTopPlaysDatabase, pThreadPool); },
             [&pBot]() { pBot->topPlaysCallback(); }
         );
 

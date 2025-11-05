@@ -72,8 +72,8 @@ void TokenManager::updateAccessToken()
                 m_accessToken = responseDataJson.at("access_token").get<std::string>();
                 return;
             }
-            // 5XX Internal Server Error -> wait, then retry
-            else if (std::to_string(httpCode)[0] == '5')
+            // 429 Too Many Requests / 5XX Internal Server Error -> wait, then retry
+            else if ((httpCode == 429) || (std::to_string(httpCode)[0] == '5'))
             {
                 LOG_WARN("Request failed (", httpCode, "); retrying in ", k_tokenWaitMs, "ms");
                 std::this_thread::sleep_for(std::chrono::milliseconds(k_tokenWaitMs));
